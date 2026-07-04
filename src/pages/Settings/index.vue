@@ -122,6 +122,22 @@
             <div class="form-tip">{{ t('settings.batchSizeTip') }}</div>
           </el-form-item>
 
+          <el-form-item :label="t('settings.concurrency')">
+            <el-input-number
+              v-model="aiConfig.concurrency"
+              :min="1"
+              :max="10"
+              :step="1"
+              :placeholder="2"
+            />
+            <div class="form-tip">{{ t('settings.concurrencyTip') }}</div>
+          </el-form-item>
+
+          <el-form-item v-if="aiConfig.provider === 'openai'" :label="t('settings.disableRateLimitWarning')">
+            <el-switch v-model="aiConfig.disableRateLimitWarning" />
+            <div class="form-tip">{{ t('settings.disableRateLimitWarningTip') }}</div>
+          </el-form-item>
+
           <el-form-item>
             <el-button type="primary" @click="handleSave">
               {{ t('common.save') }}
@@ -201,6 +217,121 @@
               </div>
             </div>
           </div>
+        </div>
+      </el-card>
+
+      <el-card class="settings-card" style="margin-top: 20px;">
+        <template #header>
+          <div class="card-header">
+            <span>{{ t('settings.webdavBackup') }}</span>
+          </div>
+        </template>
+
+        <el-form :model="webdavConfig" label-width="120px" label-position="left">
+          <el-form-item :label="t('settings.webdavUrl')">
+            <el-input
+              v-model="webdavConfig.url"
+              placeholder="https://example.com/dav"
+            />
+          </el-form-item>
+
+          <el-form-item :label="t('settings.webdavUsername')">
+            <el-input
+              v-model="webdavConfig.username"
+              placeholder="Username"
+            />
+          </el-form-item>
+
+          <el-form-item :label="t('settings.webdavPassword')">
+            <el-input
+              v-model="webdavConfig.password"
+              type="password"
+              show-password
+              placeholder="Password or App Token"
+            />
+          </el-form-item>
+
+          <el-form-item :label="t('settings.webdavDirectory')">
+            <el-input
+              v-model="webdavConfig.directory"
+              placeholder="/StarHub"
+            />
+            <div class="form-tip">{{ t('settings.webdavDirectoryTip') }}</div>
+          </el-form-item>
+
+          <div class="form-tip" style="color: var(--el-color-warning); margin-bottom: 18px; line-height: 1.5;">
+            {{ t('settings.webdavCorsTip') }}
+          </div>
+
+          <el-form-item>
+            <el-button type="primary" @click="handleSaveWebDAV">
+              {{ t('common.save') }}
+            </el-button>
+            <el-button @click="handleTestWebDAV" :loading="webdavTesting">
+              {{ t('settings.webdavTest') }}
+            </el-button>
+            <el-button type="success" @click="handleWebDAVBackup" :loading="webdavBackingUp" :disabled="!isWebDAVConfigured">
+              <el-icon><Download /></el-icon>
+              {{ t('settings.webdavBackupBtn') }}
+            </el-button>
+            <el-button type="warning" @click="handleShowWebDAVRestoreDialog" :loading="webdavRestoring" :disabled="!isWebDAVConfigured">
+              <el-icon><Upload /></el-icon>
+              {{ t('settings.webdavRestoreBtn') }}
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+
+      <el-card class="settings-card" style="margin-top: 20px;">
+        <template #header>
+          <div class="card-header">
+            <span>{{ t('settings.syncSettings') }}</span>
+          </div>
+        </template>
+
+        <div class="sync-settings">
+          <el-form label-width="120px" label-position="left">
+            <el-form-item :label="t('settings.syncInterval')">
+              <el-select v-model="syncIntervalVal" style="width: 260px;">
+                <el-option :label="t('settings.interval10m')" :value="10" />
+                <el-option :label="t('settings.interval30m')" :value="30" />
+                <el-option :label="t('settings.interval1h')" :value="60" />
+                <el-option :label="t('settings.interval4h')" :value="240" />
+                <el-option :label="t('settings.interval24h')" :value="1440" />
+                <el-option :label="t('settings.intervalManual')" :value="0" />
+              </el-select>
+              <div class="form-tip">{{ t('settings.syncIntervalTip') }}</div>
+            </el-form-item>
+
+            <el-form-item :label="t('settings.lastSyncTime')">
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="font-size: 0.9rem; color: var(--text-secondary);">
+                  {{ formattedLastSyncTime }}
+                </span>
+                <el-button 
+                  type="primary" 
+                  size="default" 
+                  :loading="repoStore.isSyncing" 
+                  @click="handleManualSync"
+                >
+                  <el-icon v-if="!repoStore.isSyncing" style="margin-right: 6px;"><Refresh /></el-icon>
+                  {{ repoStore.isSyncing ? t('settings.syncing') : t('settings.syncNow') }}
+                </el-button>
+              </div>
+            </el-form-item>
+
+            <el-form-item v-if="repoStore.isSyncing">
+              <div style="width: 100%; max-width: 500px;">
+                <el-progress 
+                  :percentage="syncPercentage" 
+                  :status="repoStore.syncProgress.current === repoStore.syncProgress.total ? 'success' : undefined"
+                />
+                <div class="form-tip" style="margin-top: 5px;">
+                  正在同步第 {{ repoStore.syncProgress.current }} / {{ repoStore.syncProgress.total || '?' }} 页 (已加载 {{ repoStore.syncProgress.count }} 个仓库)
+                </div>
+              </div>
+            </el-form-item>
+          </el-form>
         </div>
       </el-card>
 
@@ -308,15 +439,45 @@
         <el-button type="primary" @click="handleSavePreset">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- WebDAV 恢复备份选择对话框 -->
+    <el-dialog
+      v-model="showWebDAVRestoreDialog"
+      :title="t('settings.webdavBackupList')"
+      width="650px"
+    >
+      <el-table :data="webdavBackups" style="width: 100%" v-loading="loadingBackups">
+        <el-table-column :label="t('settings.categoryName')" min-width="250">
+          <template #default="scope">
+            <span>{{ scope.row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('tag.created')" width="200">
+          <template #default="scope">
+            <span>{{ scope.row.date }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('common.actions')" width="100" fixed="right">
+          <template #default="scope">
+            <el-button text size="small" type="primary" @click="handleWebDAVRestore(scope.row.name)">
+              恢复
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="webdavBackups.length === 0 && !loadingBackups" style="text-align: center; padding: 30px; color: var(--text-tertiary);">
+        {{ t('settings.webdavNoBackup') }}
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, watch } from 'vue'
+import { ref, onMounted, onActivated, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Download, Upload, Delete, View } from '@element-plus/icons-vue'
+import { Plus, Download, Upload, Delete, View, Refresh } from '@element-plus/icons-vue'
 import { getAIConfig, saveAIConfig, DEFAULT_MODELS, DEFAULT_BASE_URLS, type AIConfig } from '@/config/ai'
 import {
   getCategoryPresets,
@@ -328,6 +489,14 @@ import { useTagStore } from '@/stores/tag'
 import { useRepoStore } from '@/stores/repo'
 import { db } from '@/db'
 import Dexie from 'dexie'
+import {
+  testWebDAVConnection,
+  uploadToWebDAV,
+  downloadFromWebDAV,
+  listWebDAVBackups,
+  type WebDAVConfig,
+  type WebDAVBackupFile
+} from '@/utils/webdav'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -339,12 +508,31 @@ const aiConfig = ref<AIConfig>({
   apiKey: '',
   baseURL: '',
   model: '',
-  batchSize: 50
+  batchSize: 50,
+  disableRateLimitWarning: false
 })
 
 const testing = ref(false)
 const exporting = ref(false)
 const importing = ref(false)
+
+// WebDAV 状态变量
+const webdavConfig = ref<WebDAVConfig>({
+  url: '',
+  username: '',
+  password: '',
+  directory: '/StarHub'
+})
+const webdavTesting = ref(false)
+const webdavBackingUp = ref(false)
+const webdavRestoring = ref(false)
+const showWebDAVRestoreDialog = ref(false)
+const webdavBackups = ref<WebDAVBackupFile[]>([])
+const loadingBackups = ref(false)
+
+const isWebDAVConfigured = computed(() => {
+  return !!(webdavConfig.value.url.trim() && webdavConfig.value.username.trim())
+})
 const dataStats = ref<{
   repos: number
   tags: number
@@ -366,9 +554,59 @@ const newPreset = ref({
   keywordsStr: ''
 })
 
+// 同步设置
+const syncIntervalVal = computed({
+  get: () => repoStore.syncInterval,
+  set: (val) => {
+    repoStore.setSyncInterval(val)
+    ElMessage.success(t('settings.saveSuccess'))
+  }
+})
+
+const formattedLastSyncTime = computed(() => {
+  if (!repoStore.lastSyncTime) {
+    return t('settings.neverSynced')
+  }
+  const date = new Date(repoStore.lastSyncTime)
+  return date.toLocaleString()
+})
+
+const syncPercentage = computed(() => {
+  const { current, total } = repoStore.syncProgress
+  if (!total) return 0
+  return Math.round((current / total) * 100)
+})
+
+const handleManualSync = async () => {
+  try {
+    ElMessage.info(t('settings.syncStarted'))
+    await repoStore.loadRepos({ forceSync: true })
+    ElMessage.success(t('settings.syncCompleted'))
+    await loadDataStats()
+  } catch (error) {
+    ElMessage.error(t('settings.syncFailed'))
+  }
+}
+
 onMounted(async () => {
   aiConfig.value = getAIConfig()
   categoryPresets.value = getCategoryPresets()
+  
+  // 加载 WebDAV 配置
+  const savedWebDAV = localStorage.getItem('webdav_config')
+  if (savedWebDAV) {
+    try {
+      webdavConfig.value = {
+        url: '',
+        username: '',
+        password: '',
+        directory: '/StarHub',
+        ...JSON.parse(savedWebDAV)
+      }
+    } catch (e) {
+      console.error('Failed to parse saved WebDAV config:', e)
+    }
+  }
   
   // 确保 tagStore 已加载
   if (tagStore.tags.length === 0) {
@@ -1124,6 +1362,180 @@ const handleClearAll = async () => {
     if (error !== 'cancel') {
       console.error('Clear cancelled or failed:', error)
     }
+  }
+}
+
+// 保存 WebDAV 配置
+const handleSaveWebDAV = () => {
+  if (!webdavConfig.value.url) {
+    ElMessage.warning('请输入 WebDAV 服务器地址')
+    return
+  }
+  localStorage.setItem('webdav_config', JSON.stringify(webdavConfig.value))
+  ElMessage.success(t('settings.webdavConfigSaved'))
+}
+
+// 测试 WebDAV 连接
+const handleTestWebDAV = async () => {
+  if (!webdavConfig.value.url.trim() || !webdavConfig.value.username.trim()) {
+    ElMessage.warning('请先输入 WebDAV 服务器地址和用户名')
+    return
+  }
+
+  webdavTesting.value = true
+  try {
+    await testWebDAVConnection(webdavConfig.value)
+    ElMessage.success('WebDAV 连接成功！')
+  } catch (error: any) {
+    console.error('WebDAV connection failed:', error)
+    ElMessage.error(`连接失败: ${error.message || '未知错误'}`)
+  } finally {
+    webdavTesting.value = false
+  }
+}
+
+// 备份数据库到 WebDAV
+const handleWebDAVBackup = async () => {
+  try {
+    webdavBackingUp.value = true
+    
+    // 收集所有数据 (确保包含 repoTags，以获得最完整的备份)
+    const repos = await db.repos.toArray()
+    const tags = await db.tags.toArray()
+    const repoTags = db.repoTags ? await db.repoTags.toArray() : []
+    
+    const exportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      data: {
+        repos,
+        tags,
+        repoTags,
+        categoryPresets: getCategoryPresets()
+      },
+      stats: dataStats.value
+    }
+    
+    const content = JSON.stringify(exportData, null, 2)
+    
+    // 备份为最新版本
+    await uploadToWebDAV(webdavConfig.value, 'starhub-backup-latest.json', content)
+    
+    // 备份为带日期的时间戳版本
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-')
+    const archiveFilename = `starhub-backup-${dateStr}.json`
+    await uploadToWebDAV(webdavConfig.value, archiveFilename, content)
+    
+    ElMessage.success(t('settings.webdavBackupSuccess'))
+  } catch (error: any) {
+    console.error('WebDAV backup failed:', error)
+    ElMessage.error(`备份失败: ${error.message || '未知错误'}`)
+  } finally {
+    webdavBackingUp.value = false
+  }
+}
+
+
+const handleShowWebDAVRestoreDialog = async () => {
+  showWebDAVRestoreDialog.value = true
+  loadingBackups.value = true
+  try {
+    webdavBackups.value = await listWebDAVBackups(webdavConfig.value)
+  } catch (error: any) {
+    console.error('Failed to list backups:', error)
+    ElMessage.error(`获取备份列表失败: ${error.message || '未知错误'}`)
+  } finally {
+    loadingBackups.value = false
+  }
+}
+
+// 从指定的 WebDAV 文件恢复数据库
+const handleWebDAVRestore = async (filename: string) => {
+  try {
+    // 确认导入
+    await ElMessageBox.confirm(
+      t('settings.webdavRestoreConfirm'),
+      t('settings.importData'),
+      {
+        confirmButtonText: '确认恢复',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+    
+    showWebDAVRestoreDialog.value = false
+    webdavRestoring.value = true
+    
+    // 下载备份文件
+    const text = await downloadFromWebDAV(webdavConfig.value, filename)
+    const importData = JSON.parse(text)
+    
+    // 验证格式
+    if (!importData.version || !importData.data) {
+      throw new Error('备份文件格式无效')
+    }
+    
+    // 强制关闭同步以防冲突
+    repoStore.$state.currentSyncId = 0
+    repoStore.$state.isSyncing = false
+    repoStore.$state.isFetching = false
+    
+    // 清空当前数据
+    await db.repos.clear()
+    await db.tags.clear()
+    if (db.repoTags) {
+      await db.repoTags.clear()
+    }
+    
+    // 写入新数据
+    if (importData.data.repos && importData.data.repos.length > 0) {
+      await db.repos.bulkAdd(importData.data.repos)
+    }
+    
+    if (importData.data.tags && importData.data.tags.length > 0) {
+      await db.tags.bulkAdd(importData.data.tags)
+    }
+    
+    if (importData.data.repoTags && importData.data.repoTags.length > 0 && db.repoTags) {
+      await db.repoTags.bulkAdd(importData.data.repoTags)
+    }
+    
+    // 恢复预设分类
+    if (importData.data.categoryPresets) {
+      saveCategoryPresets(importData.data.categoryPresets)
+      categoryPresets.value = importData.data.categoryPresets
+    }
+    
+    // 重新加载数据
+    await tagStore.loadTags()
+    await repoStore.loadRepos()
+    await loadDataStats()
+    
+    ElMessage.success(t('settings.webdavRestoreSuccess'))
+    
+    // 自动返回主页
+    setTimeout(() => {
+      ElMessage({
+        message: '数据已恢复，正在返回主页...',
+        type: 'success',
+        duration: 1500
+      })
+      
+      setTimeout(() => {
+        router.push('/').then(() => {
+          window.location.reload()
+        })
+      }, 800)
+    }, 500)
+    
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('WebDAV restore failed:', error)
+      ElMessage.error(`恢复失败: ${error.message || '未知错误'}`)
+    }
+  } finally {
+    webdavRestoring.value = false
   }
 }
 </script>
