@@ -89,19 +89,34 @@ Supports multiple mainstream AI services:
 - Supports classifying only unclassified repos or reclassifying all
 - Classification accuracy up to 95%+
 
-### 🔍 Full-Text Instant Search
+### 🔍 Full-Text Search & Multi-dimensional Filtering
 
 - **Multi-dimensional Search**: Search by repository name, description, programming language, etc.
 - **Local Storage**: Based on IndexedDB, millisecond response
-- **Tag Filtering**: Filter results by tags
-- **Real-time Highlighting**: Search results highlighted in real-time
+- **Composite Filter Panel**: Added a collapsible filter panel supporting **multi-select tags**, **language filtering**, and **Star range filtering** (preset gradients like 100+, 1k+ are provided).
+- **Active Filters Status Bar**: Clearly displays all currently applied filter criteria and supports one-click reset or single item removal.
+- **Adaptive Grid Layout**: Supports responsive grid layout (2-4 columns) dynamically adapting to screen size, and automatically scales back to single column when details sidebar is open.
 
 ### 📖 README Instant Preview
 
 - Complete Markdown rendering with GFM extensions
 - Code syntax highlighting (100+ languages)
 - Perfect display of images, tables, and links
-- Quick project overview without leaving GitHub
+- Quick project overview without leaving the app, with built-in previewer for Trending page projects.
+
+### 🌐 Discover Trending (Trending)
+
+- **Trending Channels**: Discover daily/weekly/monthly hottest repositories or newly released open-source apps.
+- **Smart Filtering**: Directly filter trending projects by programming languages and platforms (macOS, Windows, Linux, browser extensions).
+- **In-App README Reader**: In-app document viewing with robust relative paths and image rendering.
+- **Instant Star Subscription**: Subscribe/Star interesting trending projects instantly and save to local IndexedDB.
+
+### ☁️ WebDAV Cloud Sync & Backup
+
+- **Data Roaming**: Configure a private WebDAV server to securely sync and backup your Star categories and tags.
+- **Multi-version Backups**: Back up data with one click, preserving both a `latest` backup and historical backups stamped with date and time.
+- **Rollback & Restore**: Fetch the backup list from the WebDAV cloud and roll back/restore with one click.
+- **Data Status Indicators**: Live database storage footprint estimator and last synced time indicator directly in the top header.
 
 ### 🌓 Dark Mode & Multi-language
 
@@ -142,19 +157,49 @@ StarHub includes 18 professional categories covering mainstream tech fields:
 > Below are some application interface screenshots. For the full experience, please run locally or wait for the online demo to be available.
 
 <p align="center">
-  <img src="./public/screenshot-01.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" />
+  <img src="./public/screenshot-01.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="Login Interface" />
 </p>
 <p align="center">
   Login Interface
 </p>
+
 <p align="center">
-  <img src="./public/screenshot-02.png"  style="max-width: 600px; box-shadow:0 2px 12px #0002" />
+  <img src="./public/screenshot-home.png"  style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="Main Page" />
 </p>
 <p align="center">
-  Main Page
+  Main Page (Adaptive multi-column grid layout)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-repo-info.png"  style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="Main Page - Repository Details" />
 </p>
 <p align="center">
-  <img src="./public/screenshot-03.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" />
+  Repository Details (Adaptive multi-column grid layout)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-filters.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="Multi-dimensional Filters" />
+</p>
+<p align="center">
+  Multi-dimensional Filter Panel (Multi-select tags, languages, stars, and active filter indicator)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-trending.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="Discover Trending Page" />
+</p>
+<p align="center">
+  Discover Trending Page (Trending channels, README preview, AI batch analysis, and direct Star)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-webdav.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="WebDAV Backup Configuration" />
+</p>
+<p align="center">
+  WebDAV Cloud Sync Settings (Rollback history versions list and sync metadata display)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-03.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="Documentation Interface" />
 </p>
 <p align="center">
   Documentation Interface
@@ -244,35 +289,41 @@ npm run dev
 <a id="deployment"></a>
 ## 📦 Deployment Guide
 
-### Method 1: Cloudflare Pages (Recommended)
+### Method 1: Cloudflare Pages (Using Wrangler CLI, Recommended)
 
-Cloudflare Pages provides free hosting and supports Cloudflare Workers for OAuth handling.
+Cloudflare Pages provides free hosting and supports Cloudflare Workers (Pages Functions) for OAuth handling. This project integrates the `wrangler.jsonc` configuration file and deployment scripts, allowing you to deploy directly from the command line.
 
-#### 1. Build Project
+#### 1. Log in to Cloudflare
+
+If you haven't logged in, run the following command in your terminal:
 
 ```bash
-npm run build
+pnpm exec wrangler login
 ```
 
-#### 2. Deploy to Cloudflare Pages
+#### 2. Build and Deploy
 
-1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Go to **Pages** > **Create a project**
-3. Connect GitHub repository or upload `dist` directory directly
-4. Set build configuration:
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
+Run the following command to automatically build and deploy your application to Cloudflare Pages:
 
-#### 3. Configure Cloudflare Workers
+```bash
+pnpm run deploy
+```
 
-OAuth token exchange logic is provided in `functions/api/getToken.ts`. Set environment variables in Cloudflare Dashboard:
+On your first deployment, Wrangler will guide you through creating or selecting a Pages project (project settings are predefined in `wrangler.jsonc` with the build output directory set to `dist`).
 
-- `CLIENT_ID`: GitHub OAuth Client ID
-- `CLIENT_SECRET`: GitHub OAuth Client Secret
+#### 3. Configure OAuth Client Secret
+
+For security reasons, `CLIENT_SECRET` is a sensitive environment variable and should not be hardcoded in the configuration file. Use the following command to securely upload your GitHub OAuth Client Secret to Cloudflare Pages secrets:
+
+```bash
+pnpm exec wrangler pages secret put CLIENT_SECRET
+```
+
+Alternatively, you can configure the `CLIENT_SECRET` environment variable under your Pages project settings in the Cloudflare Dashboard.
 
 #### 4. Update OAuth Callback URL
 
-In GitHub OAuth App settings, update the callback URL to your Cloudflare Pages domain:
+In GitHub OAuth App settings, update the authorization callback URL to your Cloudflare Pages domain:
 
 ```
 https://your-project.pages.dev/#/login

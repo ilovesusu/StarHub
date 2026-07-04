@@ -89,19 +89,34 @@
 - 支持仅分类未分类仓库或全部重新分类
 - 分类准确率高达 95%+
 
-### 🔍 全文即时搜索
+### 🔍 全文即时搜索与多维度筛选
 
-- **多维度搜索**：支持仓库名、描述、编程语言等搜索
+- **多维度搜索**：支持仓库名、描述、编程语言等关键字搜索
 - **本地存储**：基于 IndexedDB，毫秒级响应
-- **标签筛选**：可按标签过滤结果
-- **实时高亮**：搜索结果实时高亮显示
+- **复合过滤面板**：新增可折叠的筛选面板，支持**细粒度标签多选**、**编程语言过滤**以及 **Stars 数量区间过滤**（提供 100+, 1k+ 等常用梯度）
+- **实时过滤条件状态栏**：直观展示当前生效的所有过滤项，并支持一键清空或单项删除
+- **自适应网格布局**：列表支持在不同屏幕宽度下自适应呈现 2-4 列，并在侧边栏打开时缩回单栏，保证最佳视觉体验
 
 ### 📖 README 即时预览
 
 - 完整的 Markdown 渲染，支持 GFM 扩展
 - 代码语法高亮（100+ 种语言）
 - 图片、表格、链接完美显示
-- 无需跳转 GitHub 即可快速了解项目
+- 无需跳转 GitHub 即可快速了解项目，且对趋势页面项目提供内置原生阅读器
+
+### 🌐 探索趋势 (Trending)
+
+- **趋势探索**：提供“发现频道”，支持查看每日/每周/每月最热项目，或是最新发布的开源应用
+- **智能过滤**：可在探索趋势下直接按语言和平台（macOS、Windows、Linux、浏览器插件）进行过滤
+- **内置 README 阅读**：无需离开应用即可查阅项目文档，完美支持图片及相对链接解析
+- **本地直接订阅**：发现好项目可直接在趋势页 Star 并同步收藏
+
+### ☁️ WebDAV 云端备份与同步
+
+- **云端数据漫游**：支持配置私有 WebDAV 服务器，让您的 Stars 标签及分类数据安全漫游
+- **多版本备份**：支持一键上传备份，系统自动保留 `latest` 最新版本和带日期时间戳的历史归档版本
+- **恢复与回滚**：支持拉取 WebDAV 云端备份文件列表，自由选择指定的历史时间点进行一键覆盖还原
+- **同步详情指示**：常驻顶栏的数据库大小指示器和上次同步时间，为您提供清晰的数据同步反馈
 
 ### 🌓 深色模式 & 多语言
 
@@ -142,22 +157,53 @@ StarHub 内置 18 种专业分类，覆盖主流技术领域：
 > 下面是部分应用界面截图，完整体验请本地运行或等待在线演示开放。
 
 <p align="center">
-  <img src="./public/screenshot-01.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" />
+  <img src="./public/screenshot-01.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="登录界面" />
 </p>
 <p align="center">
   登录界面
 </p>
+
 <p align="center">
-  <img src="./public/screenshot-02.png"  style="max-width: 600px; box-shadow:0 2px 12px #0002" />
+  <img src="./public/screenshot-home.png"  style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="系统主页" />
 </p>
 <p align="center">
-  系统主页
+  系统主页 (主卡片自适应多列网格)
+</p>
+
+
+<p align="center">
+  <img src="./public/screenshot-repo-info.png"  style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="系统主页-仓库详情" />
 </p>
 <p align="center">
-  <img src="./public/screenshot-03.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" />
+  仓库详情 (主卡片自适应多列网格)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-filters.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="多维度条件筛选" />
 </p>
 <p align="center">
-  文档界面
+  多维度搜索筛选面板 (支持标签多选、语言过滤、Star 区间和生效指示栏)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-trending.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="发现趋势页面" />
+</p>
+<p align="center">
+  探索趋势主页 (支持发现频道、在线 README 预览、AI 批量概括与直接订阅)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-webdav.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="WebDAV 备份配置" />
+</p>
+<p align="center">
+  WebDAV 备份与恢复设置 (包含备份回滚版本选择和同步时间详情)
+</p>
+
+<p align="center">
+  <img src="./public/screenshot-03.png" style="max-width: 600px; box-shadow:0 2px 12px #0002" alt="旧版文档界面" />
+</p>
+<p align="center">
+  系统文档界面
 </p>
 
 
@@ -244,35 +290,41 @@ npm run dev
 <a id="部署指南"></a>
 ## 📦 部署指南
 
-### 方式一：Cloudflare Pages（推荐）
+### 方式一：Cloudflare Pages（使用 Wrangler CLI，推荐）
 
-Cloudflare Pages 提供免费托管，并支持 Cloudflare Workers 处理 OAuth。
+Cloudflare Pages 提供免费托管，并支持 Cloudflare Workers (Pages Functions) 处理 OAuth。本项目已经集成了 `wrangler.jsonc` 配置文件及部署脚本，可以通过命令行一键部署。
 
-#### 1. 构建项目
+#### 1. 登录 Cloudflare
+
+如果您的终端还未登录 Cloudflare，请运行以下命令进行授权登录：
 
 ```bash
-npm run build
+pnpm exec wrangler login
 ```
 
-#### 2. 部署到 Cloudflare Pages
+#### 2. 一键构建并部署
 
-1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. 进入 **Pages** > **Create a project**
-3. 连接 GitHub 仓库或直接上传 `dist` 目录
-4. 设置构建配置：
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
+运行以下命令，将自动执行打包并部署至 Cloudflare Pages：
 
-#### 3. 配置 Cloudflare Workers
+```bash
+pnpm run deploy
+```
 
-在 `functions/api/getToken.ts` 中已提供 OAuth token 交换逻辑。需要在 Cloudflare Dashboard 中设置环境变量：
+首次部署时，Wrangler 会引导您创建或选择一个 Pages 项目（项目配置已在 `wrangler.jsonc` 中定义，输出目录为 `dist`）。
 
-- `CLIENT_ID`: GitHub OAuth Client ID
-- `CLIENT_SECRET`: GitHub OAuth Client Secret
+#### 3. 配置 OAuth 密钥
+
+为了安全起见，`CLIENT_SECRET` 属于敏感信息，不应写入配置文件中。请使用以下命令，将您的 GitHub OAuth Client Secret 上传到 Cloudflare Pages 秘钥库中：
+
+```bash
+pnpm exec wrangler pages secret put CLIENT_SECRET
+```
+
+或者，您也可以直接在 Cloudflare 控制台的 Pages 项目设置中配置 `CLIENT_SECRET` 环境变量。
 
 #### 4. 更新 OAuth 回调地址
 
-在 GitHub OAuth App 设置中，将回调地址更新为你的 Cloudflare Pages 域名：
+在 GitHub OAuth App 设置中，将回调地址更新为您的 Cloudflare Pages 域名：
 
 ```
 https://your-project.pages.dev/#/login
