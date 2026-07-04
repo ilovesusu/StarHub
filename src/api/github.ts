@@ -47,6 +47,32 @@ export const githubApi = {
   // Get repository details
   getRepository(owner: string, repo: string): Promise<AxiosResponse<Repository>> {
     return http.get(`/repos/${owner}/${repo}`)
+  },
+
+  // Search repositories on GitHub
+  searchRepositories(params: {
+    q: string
+    sort?: string
+    order?: string
+    page?: number
+    per_page?: number
+  }): Promise<AxiosResponse<{ items: Repository[], total_count: number }>> {
+    return http.get(`/search/repositories?${qs.stringify(params)}`)
+  },
+
+  // Star a repository
+  starRepository(owner: string, repo: string): Promise<AxiosResponse<void>> {
+    return http.put(`/user/starred/${owner}/${repo}`)
+  },
+
+  // Unstar a repository
+  unstarRepository(owner: string, repo: string): Promise<AxiosResponse<void>> {
+    return http.delete(`/user/starred/${owner}/${repo}`)
+  },
+
+  // Check if a repository is starred
+  checkStarred(owner: string, repo: string): Promise<AxiosResponse<void>> {
+    return http.get(`/user/starred/${owner}/${repo}`)
   }
 }
 

@@ -36,6 +36,16 @@ const router = createRouter({
         requiresAuth: true,
         transition: 'fade'
       }
+    },
+    {
+      path: '/trending',
+      name: 'Trending',
+      component: () => import('@/pages/Trending/index.vue'),
+      meta: {
+        title: 'Trending',
+        requiresAuth: true,
+        transition: 'fade'
+      }
     }
   ]
 })
