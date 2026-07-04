@@ -5,6 +5,8 @@ export interface AIConfig {
   baseURL?: string
   model?: string
   batchSize?: number // 分类批次大小，默认 50
+  concurrency?: number // 分类并发限制，默认 2
+  disableRateLimitWarning?: boolean // 是否禁用 OpenAI 速率限制提示
 }
 
 // 默认配置
@@ -13,7 +15,9 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   apiKey: '',
   baseURL: '',
   model: '',
-  batchSize: 50 // 默认批次大小
+  batchSize: 50, // 默认批次大小
+  concurrency: 2, // 默认并发数
+  disableRateLimitWarning: false // 默认不禁用警告
 }
 
 // 各平台默认模型
@@ -43,6 +47,14 @@ export function getAIConfig(): AIConfig {
       // 确保 batchSize 有默认值
       if (!config.batchSize) {
         config.batchSize = DEFAULT_AI_CONFIG.batchSize
+      }
+      // 确保 concurrency 有默认值
+      if (!config.concurrency) {
+        config.concurrency = DEFAULT_AI_CONFIG.concurrency
+      }
+      // 确保 disableRateLimitWarning 有默认值
+      if (config.disableRateLimitWarning === undefined) {
+        config.disableRateLimitWarning = false
       }
       return config
     } catch (e) {

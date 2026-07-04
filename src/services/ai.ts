@@ -7,6 +7,13 @@ export interface ClassificationResult {
   confidence: number
 }
 
+export interface RepoAnalysisResult {
+  id: number
+  summary: string
+  categories: string[]
+  tags: string[]
+}
+
 // 调用 OpenAI 兼容 API
 async function callOpenAICompatible(
   messages: any[],
@@ -24,7 +31,11 @@ async function callOpenAICompatible(
       model,
       messages,
       temperature: 0.3,
-      max_tokens: 2000
+      max_tokens: 2000,
+      // 兼容 LM Studio 等本地推理引擎，它们可能不支持 response_format: { type: 'json_object' }
+      ...((baseURL.includes('192.168.') || baseURL.includes('127.0.0.1') || baseURL.includes('localhost'))
+        ? {}
+        : { response_format: { type: 'json_object' } })
     })
   })
 
@@ -89,7 +100,8 @@ async function callZhipu(
       model,
       messages,
       temperature: 0.3,
-      max_tokens: 2000
+      max_tokens: 2000,
+      response_format: { type: 'json_object' }
     })
   })
 
@@ -102,13 +114,13 @@ async function callZhipu(
   return data.choices[0].message.content
 }
 
-// 批量分类仓库（自动分批处理）
+// 批量分析与分类仓库（自动分批处理）
 export async function classifyRepositories(
   repos: Repository[],
   onProgress?: (current: number, total: number) => void,
-  onBatchComplete?: (batchResult: Map<string, number[]>, batchIndex: number, totalBatches: number) => Promise<void>,
+  onBatchComplete?: (batchResults: RepoAnalysisResult[], batchIndex: number, totalBatches: number) => Promise<void>,
   batchSize?: number // 可配置的批次大小
-): Promise<Map<string, number[]>> {
+): Promise<RepoAnalysisResult[]> {
   const config = getAIConfig()
   
   if (!config.apiKey) {
@@ -121,7 +133,7 @@ export async function classifyRepositories(
   // 分批处理：使用配置的批次大小，默认 50
   const BATCH_SIZE = batchSize || config.batchSize || 50
   const totalBatches = Math.ceil(repos.length / BATCH_SIZE)
-  const allCategoryMap = new Map<string, number[]>()
+  const allResults: RepoAnalysisResult[] = []
   
   console.log(`开始分类 ${repos.length} 个仓库，分 ${totalBatches} 批处理（每批 ${BATCH_SIZE} 个）...`)
   
@@ -154,22 +166,17 @@ export async function classifyRepositories(
     
     while (retryCount < 3 && !success) {
       try {
-        const batchCategoryMap = await classifyBatch(batchRepos, config, baseURL, model, existingCategories)
+        const batchResults = await classifyBatch(batchRepos, config, baseURL, model, existingCategories)
         
-        // 合并结果到总 map
-        for (const [category, repoIds] of batchCategoryMap.entries()) {
-          if (!allCategoryMap.has(category)) {
-            allCategoryMap.set(category, [])
-          }
-          allCategoryMap.get(category)!.push(...repoIds)
-        }
+        // 合并结果
+        allResults.push(...batchResults)
         
-        console.log(`第 ${batchIndex + 1} 批完成，已分类: ${batchCategoryMap.size} 个类别`)
+        console.log(`第 ${batchIndex + 1} 批完成，已分析: ${batchResults.length} 个项目`)
         success = true
         
         // 立即通知批次完成（异步执行，不阻塞下一批）
         if (onBatchComplete) {
-          onBatchComplete(batchCategoryMap, batchIndex + 1, totalBatches).catch(err => {
+          onBatchComplete(batchResults, batchIndex + 1, totalBatches).catch(err => {
             console.error('批次完成回调失败:', err)
           })
         }
@@ -202,13 +209,8 @@ export async function classifyRepositories(
   }
   
   console.log('所有批次处理完成！')
-  console.log('最终分类统计:', Object.fromEntries(
-    Array.from(allCategoryMap.entries()).map(([k, v]) => [k, v.length])
-  ))
-  
-  return allCategoryMap
+  return allResults
 }
-
 // 分类单个批次
 async function classifyBatch(
   repos: Repository[],
@@ -216,7 +218,7 @@ async function classifyBatch(
   baseURL: string,
   model: string,
   existingCategories: string[] = []
-): Promise<Map<string, number[]>> {
+): Promise<RepoAnalysisResult[]> {
 
   // 从用户设置中获取当前的分类预设（而不是默认配置）
   const { getCategoryPresets } = await import('@/config/categories')
@@ -226,8 +228,7 @@ async function classifyBatch(
   const currentLang = localStorage.getItem('app-language') || localStorage.getItem('app-locale') || 'zh'
   const isZh = currentLang === 'zh' || currentLang === 'zh-CN'
   
-  // 构建分类列表：使用用户当前设置的预设分类
-  // 根据当前语言显示对应的名称和描述
+  // 构建分类列表：使用用户当前设置 the preset categories
   const presetCategories = presets.map(p => {
     const name = isZh ? p.name : (p.nameEn || p.name)
     const description = isZh ? p.description : (p.descriptionEn || p.description)
@@ -246,7 +247,7 @@ async function classifyBatch(
   const categoryList = allCategories.map((cat, idx) => `${idx + 1}. ${cat}`).join('\n')
   
   // 构建 prompt
-  const systemPrompt = `你是一个专业的代码仓库分类专家。请根据仓库的以下信息进行智能分类：
+  const systemPrompt = `你是一个专业的代码仓库分析与分类专家。请根据仓库的以下信息进行智能分析与分类：
 
 **参考信息：**
 1. **仓库名称 (name/full_name)** - 项目名称通常能反映项目类型
@@ -255,27 +256,35 @@ async function classifyBatch(
 4. **标签 (topics)** - GitHub 标签，反映项目特征
 5. **README 预览 (readme_preview)** - 如果提供，包含项目文档的前 500 字符
 
-**预设分类的关键词仅供参考**，你需要根据仓库的实际特征智能判断，而不是简单的关键词匹配。
+**分析任务：**
+针对所提供列表中的每个仓库，输出以下信息：
+1. **中文一句话摘要 (summary)**：不超过 80 字，直接陈述项目的核心功能和适用场景，口语化、接地气、避免虚浮的官腔套话。
+2. **分类 (categories)**：提供 1-3 个最贴切的分类。应优先选择下面的已有分类。如果实在没有合适的分类，可以自定义非常贴切、精炼的新分类名称。
+3. **标签 (tags)**：提供 1-3 个更细粒度的自定义技术或功能标签（如 "vue3", "orm", "markdown-editor", "cli" 等），不需要在分类菜单中注册。
 
-可用的分类类别：
+**可用的分类类别：**
 ${categoryList}
 
 **分类原则：**
-1. 优先使用前面列出的自定义分类（如果仓库特征匹配）
-2. 综合分析所有信息，特别是 description 和 readme_preview
-3. 返回的 id 必须是仓库的真实 id 值，不是数组索引
-4. category 只返回分类名称部分（如 "Web 开发"），不要包含后面的描述
+1. 一个仓库可以属于 1-3 个分类，分类应客观准确。
+2. 自定义的新分类应该简短有力（不超过 6 个字），不要带序号。
+3. 返回的 id 必须是仓库的真实 id 数值，不是数组索引。
+4. categories 中返回的分类只保留名称部分（如 "Web 开发"），不要包含后面的描述和序号。
 
-请严格按照以下 JSON 格式返回分类结果（确保 JSON 格式正确）：
+请严格按照以下 JSON 格式返回分析结果（确保 JSON 格式正确）：
 {
-  "classifications": [
-    {"id": 123456789, "category": "Web 开发"},
-    {"id": 987654321, "category": "工具库"}
+  "results": [
+    {
+      "id": 123456789,
+      "summary": "基于 Vue 3 的轻量级 Markdown 编辑器，支持实时预览和快捷键操作。",
+      "categories": ["前端开发", "工具软件"],
+      "tags": ["vue3", "markdown", "editor"]
+    }
   ]
 }
 
 只返回有效的 JSON，不要有其他文字说明。`
-
+ 
   // 准备仓库信息
   const repoInfo = repos.map((repo: Repository) => {
     const info: any = {
@@ -296,7 +305,7 @@ ${categoryList}
     return info
   })
 
-  const userPrompt = `请对以下仓库进行分类：\n\n${JSON.stringify(repoInfo, null, 2)}`
+  const userPrompt = `请分析并分类以下仓库：\n\n${JSON.stringify(repoInfo, null, 2)}`
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -375,35 +384,51 @@ ${categoryList}
   }
   
   console.log('Parsed result:', result)
-  console.log('Classifications count:', result.classifications?.length)
+  console.log('Results count:', result.results?.length)
   
   // 验证返回的数据
-  if (!result.classifications || !Array.isArray(result.classifications)) {
-    throw new Error('AI 返回的数据格式错误：缺少 classifications 数组')
+  if (!result.results || !Array.isArray(result.results)) {
+    throw new Error('AI 返回的数据格式错误：缺少 results 数组')
   }
   
-  // 构建分类映射
-  const categoryMap = new Map<string, number[]>()
+  // 转换为 RepoAnalysisResult[]
+  const finalResults: RepoAnalysisResult[] = []
   
-  for (const item of result.classifications) {
-    if (!item.id || !item.category) {
-      console.warn('跳过无效的分类项:', item)
+  for (const item of result.results) {
+    if (!item.id) {
+      console.warn('跳过无效的项目 (缺少 id):', item)
       continue
     }
     
-    const category = item.category
     const repoId = typeof item.id === 'number' ? item.id : parseInt(item.id)
+    const summary = item.summary || ''
     
-    if (!categoryMap.has(category)) {
-      categoryMap.set(category, [])
+    // 确保 categories 存在且为数组
+    let categories: string[] = []
+    if (item.categories) {
+      categories = Array.isArray(item.categories) 
+        ? item.categories.map((c: any) => String(c).trim())
+        : [String(item.categories).trim()]
     }
-    categoryMap.get(category)!.push(repoId)
+    
+    // 确保 tags 存在且为数组
+    let tags: string[] = []
+    if (item.tags) {
+      tags = Array.isArray(item.tags) 
+        ? item.tags.map((t: any) => String(t).trim())
+        : [String(item.tags).trim()]
+    }
+    
+    finalResults.push({
+      id: repoId,
+      summary,
+      categories,
+      tags
+    })
   }
   
-  console.log('Category map:', Object.fromEntries(categoryMap))
-  console.log('Total categories:', categoryMap.size)
-
-  return categoryMap
+  console.log('Processed batch results count:', finalResults.length)
+  return finalResults
 }
 
 // 从错误消息中提取等待时间
@@ -448,22 +473,100 @@ function getDelayTime(provider: string): number {
   }
 }
 
-// 预定义的分类颜色
-export const CATEGORY_COLORS: Record<string, string> = {
-  'Web 开发': '#42b883',
-  '移动开发': '#34a853',
-  '数据科学': '#ff9800',
-  '工具库': '#9c27b0',
-  'DevOps': '#00bcd4',
-  '游戏开发': '#f44336',
-  '数据库': '#ff5722',
-  '安全': '#e91e63',
-  '区块链': '#ffc107',
-  '编程语言': '#3f51b5',
-  '系统编程': '#607d8b',
-  '设计': '#e91e63',
-  '文档': '#795548',
-  '测试': '#4caf50',
-  '其他': '#9e9e9e'
+// 分析单个仓库（提供一句话中文摘要与中文分类标签、特征标签）
+export async function analyzeRepository(
+  repo: Repository,
+  readmeContent?: string
+): Promise<{ summary: string; categories: string[]; tags: string[] }> {
+  const config = getAIConfig()
+  
+  if (!config.apiKey) {
+    throw new Error('请先在设置中配置 AI API Key')
+  }
+
+  const baseURL = config.baseURL || DEFAULT_BASE_URLS[config.provider]
+  const model = config.model || DEFAULT_MODELS[config.provider]
+
+  // 获取预设分类
+  let presetNames: string[] = []
+  try {
+    const { getCategoryPresets } = await import('@/config/categories')
+    presetNames = getCategoryPresets().map(p => p.name)
+  } catch (e) {
+    console.warn('无法获取预设分类:', e)
+  }
+
+  const systemPrompt = `你是一个专业的代码仓库分析专家。
+请根据提供的仓库信息，为仓库生成以下三个维度的信息：
+1. **一句话中文摘要 (summary)**：不超过 80 字，高度提炼出核心功能和使用场景，避开虚浮描述和废话，做到通俗易懂，直击痛点。
+2. **分类 (categories)**：提取 1-3 个最贴切的分类。应优先选择已有分类。如果已有分类均不匹配，可以自定义非常贴切、精炼的新分类名称。
+3. **标签 (tags)**：提取 1-3 个针对该项目技术栈或功能特征的更细粒度的自定义标签（如 "vue3", "orm", "markdown-editor", "web-scraper" 等）。
+
+**已有的分类列表：**
+${presetNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}
+
+请严格按照以下 JSON 格式返回结果（只返回 JSON，不要包含 Markdown 格式的包裹，也不要有任何其他解释性文字）：
+{
+  "summary": "利用 AI 大模型一键生成高清短视频，支持自动生成文案与字幕。",
+  "categories": ["人工智能", "视频工具"]
+}`
+
+  const userPrompt = `请分析以下仓库：
+名称：${repo.full_name}
+描述：${repo.description || '无'}
+语言：${repo.language || '未知'}
+标签：${repo.topics?.join(', ') || '无'}
+README 预览：${readmeContent ? readmeContent.substring(0, 1000) : '无'}`
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ]
+
+  let responseText: string
+  if (config.provider === 'claude') {
+    responseText = await callClaude(messages, config.apiKey, baseURL, model)
+  } else if (config.provider === 'zhipu') {
+    responseText = await callZhipu(messages, config.apiKey, baseURL, model)
+  } else {
+    responseText = await callOpenAICompatible(messages, config.apiKey, baseURL, model)
+  }
+
+  // 解析 JSON 响应
+  let jsonText = responseText.trim()
+  if (jsonText.startsWith('```json')) {
+    jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+  } else if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '')
+  }
+
+  const jsonMatch = jsonText.match(/\{[\s\S]*/)
+  if (!jsonMatch) {
+    throw new Error('AI 返回格式错误：未找到有效的 JSON')
+  }
+
+  const result = JSON.parse(jsonMatch[0])
+  if (!result.summary || !result.categories) {
+    throw new Error('AI 返回的 JSON 缺少 summary 或 categories')
+  }
+
+  // 整理格式
+  const summary = result.summary
+  const categories = Array.isArray(result.categories) 
+    ? result.categories.map((c: any) => String(c).trim())
+    : [String(result.categories).trim()]
+  const tags = Array.isArray(result.tags)
+    ? result.tags.map((t: any) => String(t).trim())
+    : (result.tags ? [String(result.tags).trim()] : [])
+
+  return {
+    summary,
+    categories,
+    tags
+  }
 }
+
+// 预定义的分类颜色，由 categories 配置统一导出
+export { CATEGORY_COLORS } from '@/config/categories'
+
 

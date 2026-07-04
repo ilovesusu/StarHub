@@ -517,6 +517,15 @@ export const DEFAULT_CATEGORIES: CategoryPreset[] = [
     keywords: ['vue', 'vuejs', 'composition-api', 'vuex', 'pinia', 'vite', 'nuxt']
   },
   {
+    name: 'Skills',
+    nameEn: 'Skills',
+    emoji: '🎯',
+    description: '智能代理技能、提示词及扩展包',
+    descriptionEn: 'Agent skills, prompts, and extensions',
+    color: '#8e44ad',
+    keywords: ['skill', 'skills', 'agent', 'prompt', 'mcp', 'capability', 'tool']
+  },
+  {
     name: '其他',
     nameEn: 'Others',
     emoji: '📦',
@@ -526,6 +535,12 @@ export const DEFAULT_CATEGORIES: CategoryPreset[] = [
     keywords: []
   }
 ]
+
+// 动态生成分类颜色映射表
+export const CATEGORY_COLORS: Record<string, string> = DEFAULT_CATEGORIES.reduce((acc, preset) => {
+  acc[preset.name] = preset.color
+  return acc
+}, {} as Record<string, string>)
 
 // 从 localStorage 获取用户自定义的预设分类
 export function getCategoryPresets(): CategoryPreset[] {
