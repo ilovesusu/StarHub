@@ -2,19 +2,55 @@
   <div class="home-layout">
     <div class="layout-header">
       <div class="header-left">
-        <h1 class="app-title">
+        <h1 class="app-title" @click="router.push('/home')">
           <div class="logo-wrapper">
             <img src="/logo.svg" alt="StarHub Logo" class="logo-img" />
           </div>
           <span class="app-name">StarHub</span>
         </h1>
+        <div class="header-nav">
+          <router-link to="/home" class="nav-item" active-class="is-active">
+            {{ t('nav.home') }}
+          </router-link>
+          <router-link to="/trending" class="nav-item" active-class="is-active">
+            {{ t('nav.trending') }}
+          </router-link>
+        </div>
       </div>
       <div class="header-right">
-        <div v-if="syncing" class="sync-indicator">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span>{{ t('home.syncing') }} ({{ syncProgress.count }} {{ t('home.repos') }})</span>
-        </div>
+        <!-- 本地数据库大小 -->
+        <el-tooltip v-if="route.path === '/home'" :content="t('home.dbSizeTooltip')" placement="bottom">
+          <div class="db-size-indicator">
+            <el-icon class="db-icon"><Coin /></el-icon>
+            <span class="db-size-text">{{ dbSize }}</span>
+          </div>
+        </el-tooltip>
+
+        <!-- 上次同步时间 -->
+        <el-tooltip v-if="route.path === '/home'" :content="t('settings.lastSyncTime')" placement="bottom">
+          <div class="last-sync-indicator">
+            <el-icon class="sync-time-icon"><Clock /></el-icon>
+            <span class="sync-time-text">{{ formattedLastSyncTime }}</span>
+          </div>
+        </el-tooltip>
+
+        <template v-if="route.path === '/home'">
+          <div v-if="syncing" class="sync-indicator">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>{{ t('home.syncing') }} ({{ syncProgress.count }} {{ t('home.repos') }})</span>
+          </div>
+          <el-tooltip v-else :content="t('settings.syncNow')" placement="bottom">
+            <el-button
+              circle
+              @click="handleManualSync"
+              class="sync-button"
+            >
+              <el-icon><Refresh /></el-icon>
+            </el-button>
+          </el-tooltip>
+        </template>
         <el-input
+          v-if="route.path === '/home'"
           v-model="searchQuery"
           :placeholder="t('home.searchPlaceholder')"
           clearable
@@ -98,16 +134,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
 import { useRepoStore } from '@/stores/repo'
 import { AuthToken } from '@/utils/auth'
 import { githubApi } from '@/api/github'
-import { debounce } from '@/utils'
+import { debounce, formatDate } from '@/utils'
 const { t, locale } = useI18n()
 import {
   Search,
@@ -119,10 +155,13 @@ import {
   Promotion,
   CircleCheck,
   Loading,
-  Refresh
+  Refresh,
+  Coin,
+  Clock
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const themeStore = useThemeStore()
 const userStore = useUserStore()
 const repoStore = useRepoStore()
@@ -132,6 +171,54 @@ const theme = computed(() => themeStore.theme)
 const currentLanguage = computed(() => themeStore.language)
 const syncing = computed(() => repoStore.isSyncing)
 const syncProgress = computed(() => repoStore.syncProgress)
+const lastSyncTime = computed(() => repoStore.lastSyncTime)
+
+const formattedLastSyncTime = computed(() => {
+  if (!lastSyncTime.value) {
+    return t('settings.neverSynced')
+  }
+  return formatDate(lastSyncTime.value, locale.value)
+})
+
+const handleManualSync = async () => {
+  try {
+    ElMessage.info(t('settings.syncStarted'))
+    await repoStore.loadRepos({ forceSync: true })
+    ElMessage.success(t('settings.syncCompleted'))
+  } catch (error) {
+    ElMessage.error(t('settings.syncFailed'))
+  }
+}
+
+// 数据库大小显示
+const dbSize = ref('0 KB')
+
+const updateDbSize = async () => {
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const estimate = await navigator.storage.estimate()
+      const usage = estimate.usage || 0
+      if (usage < 1024) {
+        dbSize.value = `${usage} B`
+      } else if (usage < 1024 * 1024) {
+        dbSize.value = `${(usage / 1024).toFixed(1)} KB`
+      } else {
+        dbSize.value = `${(usage / (1024 * 1024)).toFixed(1)} MB`
+      }
+    } else {
+      dbSize.value = '未知'
+    }
+  } catch (e) {
+    dbSize.value = '未知'
+  }
+}
+
+watch(syncing, async (newVal, oldVal) => {
+  if (oldVal === true && newVal === false) {
+    // 延迟 500ms 等待数据库事务彻底提交，以获得最新物理占用
+    setTimeout(updateDbSize, 500)
+  }
+})
 
 // 侧边栏宽度调整
 const sidebarWidth = ref(320)
@@ -280,6 +367,9 @@ const handleCommand = async (command: string) => {
 
 // 页面加载时恢复用户信息
 onMounted(async () => {
+  // 加载本地数据库占用大小
+  updateDbSize()
+
   // 如果有 token 但没有用户信息，尝试从 GitHub API 获取
   if (AuthToken.exist() && !userStore.user) {
     try {
@@ -321,6 +411,10 @@ onMounted(async () => {
   }
 
   .header-left {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+
     .app-title {
       display: flex;
       align-items: center;
@@ -363,6 +457,51 @@ onMounted(async () => {
         }
       }
     }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-primary);
+      padding: 4px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+
+      [data-theme='dark'] & {
+        background: rgba(15, 23, 42, 0.5);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .nav-item {
+        padding: 6px 18px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-radius: 16px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        &:hover {
+          color: var(--el-color-primary);
+          background: rgba(64, 158, 255, 0.08);
+        }
+
+        &.is-active {
+          background: var(--el-color-primary);
+          color: #ffffff !important;
+          box-shadow: 0 2px 8px rgba(64, 158, 255, 0.35);
+          
+          [data-theme='dark'] & {
+            box-shadow: 0 2px 12px rgba(64, 158, 255, 0.5);
+          }
+        }
+      }
+    }
   }
 
   .header-right {
@@ -401,6 +540,7 @@ onMounted(async () => {
         background-color: var(--bg-primary) !important;
         border-color: var(--border) !important;
         box-shadow: 0 0 0 1px var(--border) inset !important;
+        border-radius: 20px;
         
         &:hover {
           box-shadow: 0 0 0 1px var(--el-color-primary) inset !important;
@@ -426,7 +566,79 @@ onMounted(async () => {
         }
       }
     }
-    
+
+    .db-size-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      transition: all $transition-base;
+      cursor: help;
+      user-select: none;
+      margin-right: $spacing-xs;
+
+      &:hover {
+        border-color: var(--el-color-primary);
+        color: var(--el-color-primary);
+        background-color: rgba(64, 158, 255, 0.05);
+
+        .db-icon {
+          color: var(--el-color-primary);
+        }
+      }
+
+      .db-icon {
+        font-size: 0.95rem;
+        color: var(--text-tertiary);
+        transition: color $transition-base;
+      }
+
+      .db-size-text {
+        font-weight: 500;
+      }
+    }
+
+    .last-sync-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      transition: all $transition-base;
+      cursor: help;
+      user-select: none;
+      margin-right: $spacing-xs;
+
+      &:hover {
+        border-color: var(--el-color-primary);
+        color: var(--el-color-primary);
+        background-color: rgba(64, 158, 255, 0.05);
+
+        .sync-time-icon {
+          color: var(--el-color-primary);
+        }
+      }
+
+      .sync-time-icon {
+        font-size: 0.95rem;
+        color: var(--text-tertiary);
+        transition: color $transition-base;
+      }
+
+      .sync-time-text {
+        font-weight: 500;
+      }
+    }
+
     .sync-indicator {
       display: flex;
       align-items: center;

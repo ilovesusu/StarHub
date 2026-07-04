@@ -293,6 +293,14 @@ export const useTagStore = defineStore('tag', {
     },
 
     async washTags(allRepoIds: Set<number>) {
+      // Prevent overwriting DB if tags are not loaded yet
+      if (this.$state.tags.length === 0) {
+        await this.loadTags()
+      }
+      if (this.$state.tags.length === 0) {
+        return // No tags to clean up
+      }
+
       // Remove repo IDs that no longer exist
       const freshTags = this.$state.tags.map(tag => ({
         ...tag,

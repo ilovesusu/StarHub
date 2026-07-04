@@ -5,13 +5,18 @@
         <SideMenu />
       </template>
       <template #main>
-        <div class="home-content">
-          <div class="repo-list-wrapper" :style="{ width: repoListWidth + 'px' }">
+        <div class="home-content" :class="{ 'detail-open': !!selectedRepo }">
+          <div 
+            class="repo-list-wrapper" 
+            :class="{ 'is-resizing': isContentResizing }"
+            :style="selectedRepo ? { width: repoListWidth + 'px' } : { width: '100%' }"
+          >
             <RepoList
               :repos="filteredRepos"
               :loading="loading"
               :syncing="syncing"
               :activeRepo="selectedRepo"
+              :detailOpen="!!selectedRepo"
               @repo-click="handleRepoClick"
             />
           </div>
@@ -26,7 +31,6 @@
               @close="handleCloseDetail"
             />
           </div>
-          <EmptyState v-else />
         </div>
       </template>
     </HomeLayout>
@@ -41,7 +45,6 @@ import HomeLayout from '@/layouts/HomeLayout.vue'
 import SideMenu from './components/SideMenu.vue'
 import RepoList from './components/RepoList.vue'
 import DetailView from './components/DetailView.vue'
-import EmptyState from './components/EmptyState.vue'
 import type { Repository } from '@/types'
 
 const repoStore = useRepoStore()
@@ -54,11 +57,16 @@ const loading = computed(() => repoStore.isFetching)
 const syncing = computed(() => repoStore.isSyncing)
 
 // 内容区宽度调整
-const repoListWidth = ref(480)
+const repoListWidth = ref(380)
 const isContentResizing = ref(false)
+let startX = 0
+let startWidth = 0
 
 const startContentResize = (e: MouseEvent) => {
   isContentResizing.value = true
+  startX = e.clientX
+  startWidth = repoListWidth.value
+  document.body.classList.add('is-resizing')
   document.addEventListener('mousemove', handleContentResize)
   document.addEventListener('mouseup', stopContentResize)
   e.preventDefault()
@@ -66,15 +74,17 @@ const startContentResize = (e: MouseEvent) => {
 
 const handleContentResize = (e: MouseEvent) => {
   if (!isContentResizing.value) return
-  const newWidth = e.clientX - (document.querySelector('.layout-sidebar') as HTMLElement)?.offsetWidth - 4 // 减去侧边栏宽度和拖���条宽度
-  // 限制最小宽度 400px，最大宽度 800px
-  if (newWidth >= 400 && newWidth <= 800) {
+  const deltaX = e.clientX - startX
+  const newWidth = startWidth + deltaX
+  // 限制最小宽度 300px，最大宽度 1000px
+  if (newWidth >= 300 && newWidth <= 1000) {
     repoListWidth.value = newWidth
   }
 }
 
 const stopContentResize = () => {
   isContentResizing.value = false
+  document.body.classList.remove('is-resizing')
   document.removeEventListener('mousemove', handleContentResize)
   document.removeEventListener('mouseup', stopContentResize)
 }
@@ -114,17 +124,27 @@ onMounted(async () => {
 .home-content {
   display: flex;
   height: 100%;
+  width: 100%;
+  overflow: hidden;
   position: relative;
 }
 
 .repo-list-wrapper {
-  min-width: 400px;
-  max-width: 800px;
   height: 100%;
   flex-shrink: 0;
+  overflow: hidden;
   
+  &.is-resizing {
+    transition: none !important;
+  }
+  
+  &:not(.is-resizing) {
+    transition: width 0.2s ease;
+  }
+
   :deep(.repo-list) {
     width: 100%;
+    min-width: 0;
     border-right: none;
   }
 }
@@ -136,6 +156,7 @@ onMounted(async () => {
   flex-shrink: 0;
   transition: background-color $transition-base;
   position: relative;
+  z-index: 10;
 
   &:hover {
     background: var(--el-color-primary);
@@ -166,7 +187,25 @@ onMounted(async () => {
 .detail-wrapper {
   flex: 1;
   height: 100%;
+  min-width: 0;
   overflow: hidden;
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+:global(body.is-resizing) {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 </style>
 

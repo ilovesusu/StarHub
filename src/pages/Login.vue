@@ -361,7 +361,6 @@ import { openWindowCenter } from '@/utils'
 import { Link, Collection, Search, MagicStick, Reading } from '@element-plus/icons-vue'
 import { authApi } from '@/api/auth'
 import qs from 'query-string'
-import { GITHUB_OAUTH_CONFIG } from '@/config/oauth'
 
 const { t, locale } = useI18n()
 const themeStore = useThemeStore()
@@ -440,45 +439,51 @@ const login = async (code: string) => {
   }
 }
 
-const handleLogin = () => {
+const handleLogin = async () => {
   loading.value = true
   error.value = ''
 
-  // GitHub OAuth parameters（完全按照原项目的方式）
-  // 注意：GitHub OAuth 必须要有 Client ID，这是 GitHub 的安全要求
-  const clientId = GITHUB_OAUTH_CONFIG.CLIENT_ID
-  
-  // 检查是否配置了 Client ID
-  if (!clientId || !clientId.trim()) {
-    error.value = t('login.configError')
-    loading.value = false
-    return
-  }
+  try {
+    // 动态从后端拉取配置（包含 CLIENT_ID）
+    const resConfig = await authApi.getConfig()
+    const clientId = resConfig.data?.CLIENT_ID
 
-  // 使用 hash 路由作为回调地址（像原项目一样）
-  const params = {
-    client_id: clientId,
-    redirect_uri: location.origin + '#/login'
-  }
-  const base = 'https://github.com/login/oauth/authorize?'
-  const url = base + qs.stringify(params)
-  
-  // Open OAuth window
-  const authWindow = openWindowCenter(url, 'authWindow', 600, 600)
-
-  // 设置回调处理函数（会被回调页面调用）
-  ;(window as any).oauthGetCodeCb = (code: string) => {
-    if (authWindow) authWindow.close()
-    delete (window as any).oauthGetCodeCb
-    
-    if (!code) {
-      console.error('github auth error')
-      error.value = t('login.error')
+    // 检查是否配置了 Client ID
+    if (!clientId || !clientId.trim()) {
+      error.value = t('login.configError')
       loading.value = false
       return
     }
+
+    // 使用 hash 路由作为回调地址（像原项目一样）
+    const params = {
+      client_id: clientId,
+      redirect_uri: location.origin + '#/login'
+    }
+    const base = 'https://github.com/login/oauth/authorize?'
+    const url = base + qs.stringify(params)
     
-    login(code)
+    // Open OAuth window
+    const authWindow = openWindowCenter(url, 'authWindow', 600, 600)
+
+    // 设置回调处理函数（会被回调页面调用）
+    ;(window as any).oauthGetCodeCb = (code: string) => {
+      if (authWindow) authWindow.close()
+      delete (window as any).oauthGetCodeCb
+      
+      if (!code) {
+        console.error('github auth error')
+        error.value = t('login.error')
+        loading.value = false
+        return
+      }
+      
+      login(code)
+    }
+  } catch (e: any) {
+    console.error('获取 OAuth 配置失败:', e)
+    error.value = '无法获取 GitHub OAuth Client ID，请检查后端服务配置。'
+    loading.value = false
   }
 }
 

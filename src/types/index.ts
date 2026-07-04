@@ -37,6 +37,8 @@ export interface Repository {
   archived: boolean
   disabled: boolean
   private: boolean
+  ai_summary?: string
+  ai_tags?: string[]
 }
 
 export interface Tag {

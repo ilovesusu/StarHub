@@ -1,10 +1,33 @@
 import { defineStore } from 'pinia'
+import { toRaw } from 'vue'
 import type { Repository } from '@/types'
 import { db } from '@/db'
 import { githubApi } from '@/api/github'
 import { getPageFromLinkStr } from '@/utils'
 import { useTagStore } from './tag'
 import Dexie from 'dexie'
+
+const LAST_SYNC_KEY = 'starhub_last_sync_time'
+const SYNC_INTERVAL_KEY = 'starhub_sync_interval'
+
+export const getLastSyncTime = (): number => {
+  const val = localStorage.getItem(LAST_SYNC_KEY)
+  return val ? parseInt(val, 10) : 0
+}
+
+export const setLastSyncTime = (time: number): void => {
+  localStorage.setItem(LAST_SYNC_KEY, time.toString())
+}
+
+export const getSyncInterval = (): number => {
+  const val = localStorage.getItem(SYNC_INTERVAL_KEY)
+  // Default is 60 minutes (1 hour)
+  return val ? parseInt(val, 10) : 60
+}
+
+export const setSyncInterval = (interval: number): void => {
+  localStorage.setItem(SYNC_INTERVAL_KEY, interval.toString())
+}
 
 export const useRepoStore = defineStore('repo', {
   state: () => ({
@@ -22,9 +45,17 @@ export const useRepoStore = defineStore('repo', {
     searchQuery: '',
     selectedLanguage: null as string | null,
     selectedTag: null as string | null,
+    // Multidimensional search filters
+    searchTags: [] as string[],
+    searchLanguages: [] as string[],
+    searchMinStars: null as number | null,
+    searchMaxStars: null as number | null,
     // Pagination
     currentPage: 1,
-    pageSize: 50
+    pageSize: 50,
+    // Sync Settings
+    lastSyncTime: getLastSyncTime(),
+    syncInterval: getSyncInterval()
   }),
 
   getters: {
@@ -37,8 +68,17 @@ export const useRepoStore = defineStore('repo', {
         result = this.untaggedRepos
       }
 
-      // Filter by tag
-      if (this.selectedTag) {
+      // Filter by tags (multiple)
+      if (this.searchTags && this.searchTags.length > 0) {
+        const tagStore = useTagStore()
+        const tagReposList = this.searchTags.map((tagId: string) => {
+          const tag = tagStore.tags.find((t: any) => t.id === tagId)
+          return new Set(tag?.repos || [])
+        })
+        result = result.filter((repo: Repository) => {
+          return tagReposList.every(repoSet => repoSet.has(repo.id))
+        })
+      } else if (this.selectedTag) {
         const tagStore = useTagStore()
         const tag = tagStore.tags.find((t: any) => t.id === this.selectedTag)
         if (tag && tag.repos && Array.isArray(tag.repos)) {
@@ -47,9 +87,21 @@ export const useRepoStore = defineStore('repo', {
         }
       }
 
-      // Filter by language
-      if (this.selectedLanguage) {
+      // Filter by languages (multiple)
+      if (this.searchLanguages && this.searchLanguages.length > 0) {
+        result = result.filter((repo: Repository) => 
+          repo.language && this.searchLanguages.includes(repo.language)
+        )
+      } else if (this.selectedLanguage) {
         result = result.filter((repo: Repository) => repo.language === this.selectedLanguage)
+      }
+
+      // Filter by stars range
+      if (this.searchMinStars !== null && this.searchMinStars !== undefined) {
+        result = result.filter((repo: Repository) => repo.stargazers_count >= this.searchMinStars!)
+      }
+      if (this.searchMaxStars !== null && this.searchMaxStars !== undefined) {
+        result = result.filter((repo: Repository) => repo.stargazers_count <= this.searchMaxStars!)
       }
 
       // Filter by search query
@@ -110,7 +162,62 @@ export const useRepoStore = defineStore('repo', {
   },
 
   actions: {
-    async loadRepos(skipLocalLoad = false) {
+    async loadLocalRepos() {
+      try {
+        this.$state.loading = true
+        const localRepos = await db.repos.toArray()
+        this.$state.repos = localRepos || []
+        return this.$state.repos.length > 0
+      } catch (error) {
+        console.error('Failed to load local repos:', error)
+        return false
+      } finally {
+        this.$state.loading = false
+      }
+    },
+
+    setSyncInterval(interval: number) {
+      this.$state.syncInterval = interval
+      setSyncInterval(interval)
+    },
+
+    updateLastSyncTime(time: number) {
+      this.$state.lastSyncTime = time
+      setLastSyncTime(time)
+    },
+
+    async loadRepos(options: { forceSync?: boolean } = {}) {
+      // 1. Load from IndexedDB first
+      const hasLocalData = await this.loadLocalRepos()
+      
+      // 2. Determine if we need to sync from GitHub
+      const forceSync = options.forceSync || false
+      
+      let shouldSync = false
+      if (!hasLocalData) {
+        // No local data, must sync
+        shouldSync = true
+      } else if (forceSync) {
+        // Manually triggered sync
+        shouldSync = true
+      } else if (this.$state.syncInterval > 0) {
+        // Auto-sync checks
+        const now = Date.now()
+        // interval is in minutes
+        if (now - this.$state.lastSyncTime > this.$state.syncInterval * 60 * 1000) {
+          shouldSync = true
+        }
+      }
+      
+      if (shouldSync) {
+        await this.syncRepos()
+      } else {
+        // If no sync is needed, ensure isFetching is false so loading UI stops
+        this.$state.isFetching = false
+      }
+    },
+
+    async syncRepos() {
       // Prevent multiple simultaneous syncs
       if (this.$state.isSyncing) {
         return
@@ -128,22 +235,16 @@ export const useRepoStore = defineStore('repo', {
       try {
         const allReposMap = new Map<number, Repository>()
         
-        // Load from IndexedDB first (unless explicitly skipped)
-        if (!skipLocalLoad) {
-          const localRepos = await db.repos.toArray()
-          this.$state.repos = localRepos || []
-          
-          // Initialize map with local repos
-          localRepos.forEach((repo: Repository) => {
-            allReposMap.set(repo.id, repo)
-          })
-        } else {
-          // When skipping local load, start with empty state
-          this.$state.repos = []
-        }
+        // Always load existing repos from DB to avoid wiping out during partial updates
+        const localRepos = await db.repos.toArray()
+        this.$state.repos = localRepos || []
+        localRepos.forEach((repo: Repository) => {
+          allReposMap.set(repo.id, repo)
+        })
         
         // Helper function to sanitize repo data for IndexedDB
         const sanitizeRepo = (repo: any): Repository => {
+          const existing = allReposMap.get(repo.id)
           return {
             id: repo.id,
             name: repo.name,
@@ -165,7 +266,9 @@ export const useRepoStore = defineStore('repo', {
             topics: repo.topics || [],
             archived: repo.archived || false,
             disabled: repo.disabled || false,
-            private: repo.private || false
+            private: repo.private || false,
+            ai_summary: repo.ai_summary || existing?.ai_summary,
+            ai_tags: repo.ai_tags || existing?.ai_tags
           }
         }
         
@@ -274,6 +377,7 @@ export const useRepoStore = defineStore('repo', {
           updateReposFromMap(true)
           this.$state.isSyncing = false
           this.$state.currentSyncId = 0
+          this.updateLastSyncTime(Date.now())
           return
         }
 
@@ -286,6 +390,7 @@ export const useRepoStore = defineStore('repo', {
           updateReposFromMap(true)
           this.$state.isSyncing = false
           this.$state.currentSyncId = 0
+          this.updateLastSyncTime(Date.now())
           return
         }
 
@@ -351,10 +456,11 @@ export const useRepoStore = defineStore('repo', {
         // Mark sync as complete
         this.$state.isSyncing = false
         this.$state.currentSyncId = 0
+        this.updateLastSyncTime(Date.now())
 
         // Clean up tags for non-existent repos (will be called from component to avoid circular dependency)
       } catch (error: any) {
-        console.error('Failed to load repos:', error)
+        console.error('Failed to sync repos:', error)
         // Always reset sync state on error
         this.$state.isFetching = false
         this.$state.isSyncing = false
@@ -383,7 +489,7 @@ export const useRepoStore = defineStore('repo', {
               window.location.reload()
             } catch (e) {
               console.error('Failed to delete database:', e)
-              alert('自动清理失败，请手动清理：\n1. 按 F12 打开开发者工具\n2. 进入 Application 标签\n3. 删除 IndexedDB 中的 StarHubDB\n4. 刷新页面')
+              alert('自动清理失败，请手动清理')
             }
           }).catch(() => {
             // User cancelled
@@ -403,6 +509,34 @@ export const useRepoStore = defineStore('repo', {
       }
     },
 
+    async unstarRepo(repoId: number) {
+      try {
+        const repo = this.$state.repos.find((r: Repository) => r.id === repoId)
+        if (!repo) return
+
+        const [owner, name] = repo.full_name.split('/')
+        await githubApi.unstarRepository(owner, name)
+
+        await db.repos.delete(repoId)
+        if (db.repoTags) {
+          await db.repoTags.where('repoId').equals(repoId).delete()
+        }
+
+        this.$state.repos = this.$state.repos.filter((r: Repository) => r.id !== repoId)
+
+        const tagStore = useTagStore()
+        for (const tag of tagStore.tags) {
+          if (tag.repos && tag.repos.includes(repoId)) {
+            const updatedRepoIds = tag.repos.filter((id: number) => id !== repoId)
+            await tagStore.updateTag(tag.id, { repos: updatedRepoIds })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to unstar repo in store:', error)
+        throw error
+      }
+    },
+
     setSearchQuery(query: string) {
       this.$state.searchQuery = query
       this.$state.currentPage = 1 // Reset to first page when searching
@@ -410,12 +544,47 @@ export const useRepoStore = defineStore('repo', {
 
     setSelectedLanguage(language: string | null) {
       this.$state.selectedLanguage = language
+      this.$state.searchLanguages = language ? [language] : []
       this.$state.currentPage = 1 // Reset to first page
     },
 
     setSelectedTag(tagId: string | null) {
       this.$state.selectedTag = tagId
+      this.$state.searchTags = tagId ? [tagId] : []
       this.$state.currentPage = 1 // Reset to first page
+    },
+
+    setSearchTags(tags: string[]) {
+      this.$state.searchTags = tags
+      this.$state.selectedTag = tags.length === 1 ? tags[0] : null
+      this.$state.currentPage = 1
+    },
+
+    setSearchLanguages(languages: string[]) {
+      this.$state.searchLanguages = languages
+      this.$state.selectedLanguage = languages.length === 1 ? languages[0] : null
+      this.$state.currentPage = 1
+    },
+
+    setSearchMinStars(stars: number | null) {
+      this.$state.searchMinStars = stars
+      this.$state.currentPage = 1
+    },
+
+    setSearchMaxStars(stars: number | null) {
+      this.$state.searchMaxStars = stars
+      this.$state.currentPage = 1
+    },
+
+    resetFilters() {
+      this.$state.selectedTag = null
+      this.$state.selectedLanguage = null
+      this.$state.searchTags = []
+      this.$state.searchLanguages = []
+      this.$state.searchMinStars = null
+      this.$state.searchMaxStars = null
+      this.$state.filterType = 'all'
+      this.$state.currentPage = 1
     },
 
     setFilterType(type: 'all' | 'untagged') {
@@ -424,6 +593,7 @@ export const useRepoStore = defineStore('repo', {
       // Clear tag selection when switching filter type
       if (type === 'all' || type === 'untagged') {
         this.$state.selectedTag = null
+        this.$state.searchTags = []
       }
     },
 
@@ -475,6 +645,10 @@ export const useRepoStore = defineStore('repo', {
         this.$state.repos = []
         this.$state.selectedTag = null
         this.$state.selectedLanguage = null
+        this.$state.searchTags = []
+        this.$state.searchLanguages = []
+        this.$state.searchMinStars = null
+        this.$state.searchMaxStars = null
         this.$state.filterType = 'all'
         this.$state.searchQuery = ''
         this.$state.currentPage = 1
@@ -544,11 +718,12 @@ export const useRepoStore = defineStore('repo', {
         // Clear localStorage related data (but preserve important settings)
         const keysToRemove: string[] = []
         Object.keys(localStorage).forEach(key => {
-          // Don't remove theme, language, or AI config
+          // Don't remove theme, language, AI config, or sync interval setting
           if (!key.includes('theme') && 
               !key.includes('language') && 
               !key.includes('ai_') && 
-              !key.includes('category_presets')) {
+              !key.includes('category_presets') &&
+              !key.includes('starhub_sync_interval')) {
             if (key.includes('repo') || key.includes('tag') || key.includes('sync')) {
               keysToRemove.push(key)
             }
@@ -556,13 +731,47 @@ export const useRepoStore = defineStore('repo', {
         })
         keysToRemove.forEach(key => localStorage.removeItem(key))
         
-        // Reload from GitHub, skip loading from IndexedDB
-        await this.loadRepos(true)
+        // Reload from GitHub, force sync
+        await this.loadRepos({ forceSync: true })
       } catch (error) {
         console.error('Failed to clear and reload repos:', error)
         // Reset sync state on error
         this.$state.isSyncing = false
         this.$state.isFetching = false
+        throw error
+      }
+    },
+
+    async updateRepoAIInfo(repoId: number, aiInfo: { ai_summary?: string; ai_tags?: string[] }) {
+      try {
+        const repo = this.$state.repos.find((r: Repository) => r.id === repoId)
+        if (!repo) return
+
+        // 使用 toRaw 剥离 Vue Proxy 响应式包装
+        const rawRepo = toRaw(repo)
+        const updatedRepo = {
+          ...rawRepo,
+          ...aiInfo,
+          // 确保子对象也没有 Proxy 包装
+          owner: rawRepo.owner ? { ...toRaw(rawRepo.owner) } : undefined,
+          topics: rawRepo.topics ? [...rawRepo.topics] : [],
+          license: rawRepo.license ? { ...toRaw(rawRepo.license) } : undefined
+        }
+
+        // 转为纯 JS 对象写入 IndexedDB，彻底防范 DataCloneError
+        const dbReadyRepo = JSON.parse(JSON.stringify(updatedRepo))
+        await db.repos.put(dbReadyRepo)
+        
+        // 更新内存状态
+        const index = this.$state.repos.findIndex((r: Repository) => r.id === repoId)
+        if (index !== -1) {
+          this.$state.repos[index] = {
+            ...repo,
+            ...aiInfo
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update repo AI info:', error)
         throw error
       }
     }

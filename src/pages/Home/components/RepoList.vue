@@ -1,5 +1,5 @@
 <template>
-  <div class="repo-list">
+  <div class="repo-list" :class="{ 'is-detail-open': detailOpen }">
     <div class="repo-list-header">
       <div class="header-left">
         <el-button
@@ -44,6 +44,18 @@
         </el-button>
       </div>
       <div class="header-actions" v-if="!selectMode">
+        <el-button 
+          size="small" 
+          text
+          class="filter-toggle-btn"
+          :class="{ 'is-active': showFilterPanel || hasActiveFilters }"
+          @click="showFilterPanel = !showFilterPanel"
+        >
+          <el-icon><Filter /></el-icon>
+          <span style="margin-left: 4px;">筛选</span>
+          <span v-if="activeFiltersCount > 0" class="filter-count-badge">{{ activeFiltersCount }}</span>
+        </el-button>
+
         <el-dropdown @command="handleSortChange" trigger="click">
           <el-button size="small" text>
             <el-icon><Sort /></el-icon>
@@ -71,6 +83,109 @@
         </el-dropdown>
       </div>
     </div>
+
+    <!-- 内联多维筛选折叠面板 -->
+    <el-collapse-transition>
+      <div v-show="showFilterPanel" class="inline-filter-panel">
+        <!-- 1. 分类状态 -->
+        <div class="filter-row">
+          <span class="row-label">{{ t('home.filterByType') }}</span>
+          <div class="row-content">
+            <el-radio-group v-model="filterType" size="small" class="filter-radio-group">
+              <el-radio-button label="all">{{ t('home.allTypes') }}</el-radio-button>
+              <el-radio-button label="untagged">{{ t('home.unclassifiedOnly') }}</el-radio-button>
+            </el-radio-group>
+          </div>
+        </div>
+
+
+
+        <!-- 4. 星标范围 -->
+        <div class="filter-row">
+          <span class="row-label">{{ t('home.filterByStars') }}</span>
+          <div class="row-content stars-filter-wrapper">
+            <div class="stars-presets">
+              <button 
+                class="preset-btn" 
+                :class="{ active: currentStarsPreset === 'all' }"
+                @click="applyStarsPreset('all')"
+              >{{ t('home.noLimit') }}</button>
+              <button 
+                class="preset-btn" 
+                :class="{ active: currentStarsPreset === '1k' }"
+                @click="applyStarsPreset('1k')"
+              >1K+</button>
+              <button 
+                class="preset-btn" 
+                :class="{ active: currentStarsPreset === '5k' }"
+                @click="applyStarsPreset('5k')"
+              >5K+</button>
+              <button 
+                class="preset-btn" 
+                :class="{ active: currentStarsPreset === '10k' }"
+                @click="applyStarsPreset('10k')"
+              >10K+</button>
+            </div>
+            <div class="stars-custom-range">
+              <el-input-number 
+                v-model="searchMinStars" 
+                :min="0" 
+                :controls="false"
+                :placeholder="t('home.minStars')"
+                size="small"
+                class="custom-stars-input"
+              />
+              <span class="range-connector">至</span>
+              <el-input-number 
+                v-model="searchMaxStars" 
+                :min="0" 
+                :controls="false"
+                :placeholder="t('home.maxStars')"
+                size="small"
+                class="custom-stars-input"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-collapse-transition>
+    
+    <!-- 激活的多维筛选徽章栏 -->
+    <div v-if="hasActiveFilters" class="active-filters-bar">
+      <div class="filters-badges">
+        <el-tag
+          v-for="filter in activeFilters"
+          :key="`${filter.type}-${filter.key}`"
+          closable
+          size="small"
+          :color="filter.type === 'tag' ? filter.color + '1a' : ''"
+          :style="{ 
+            borderColor: filter.color, 
+            color: filter.type === 'tag' ? filter.color : 'var(--text-primary)'
+          }"
+          class="filter-badge-item"
+          @close="removeFilter(filter)"
+        >
+          <span 
+            v-if="filter.type === 'language'" 
+            class="lang-badge-dot" 
+            :style="{ backgroundColor: filter.color }"
+          ></span>
+          {{ filter.label }}
+        </el-tag>
+      </div>
+      <el-button 
+        link 
+        type="danger" 
+        size="small" 
+        class="clear-all-filters-btn"
+        @click="handleClearAllFilters"
+      >
+        <el-icon><Delete /></el-icon>
+        <span style="margin-left: 4px;">{{ t('home.resetFilters') }}</span>
+      </el-button>
+    </div>
+
     <div class="repo-list-content">
       <div v-if="loading" class="loading-container">
         <el-skeleton
@@ -131,13 +246,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import RepoCard from './RepoCard.vue'
 import BatchTagDialog from './BatchTagDialog.vue'
 import type { Repository } from '@/types'
-import { Box, Collection, Close, Check, Sort, Clock, Star, Calendar } from '@element-plus/icons-vue'
+import { Box, Collection, Close, Check, Sort, Clock, Star, Calendar, Delete, Filter } from '@element-plus/icons-vue'
+import { getLanguageColor } from '@/utils/languageColors'
 
 const props = defineProps<{
   repos: Repository[]
   loading: boolean
   syncing?: boolean
   activeRepo?: Repository | null
+  detailOpen?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -147,6 +264,139 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const repoStore = useRepoStore()
 const tagStore = useTagStore()
+
+// Active filters computation for multidimensional search display
+const activeFilters = computed(() => {
+  const filters = []
+  
+  // 1. Classification status
+  if (repoStore.filterType === 'untagged') {
+    filters.push({
+      type: 'filterType',
+      key: 'untagged',
+      label: t('home.unclassifiedOnly'),
+      color: '#ef4444'
+    })
+  }
+  
+  // 2. Custom tags
+  repoStore.searchTags.forEach(tagId => {
+    const tag = tagStore.tags.find(t => t.id === tagId)
+    if (tag) {
+      filters.push({
+        type: 'tag',
+        key: tagId,
+        label: (tag.emoji ? tag.emoji + ' ' : '') + tag.name,
+        color: tag.color
+      })
+    }
+  })
+  
+  // 3. Languages
+  repoStore.searchLanguages.forEach(lang => {
+    filters.push({
+      type: 'language',
+      key: lang,
+      label: lang,
+      color: getLanguageColor(lang)
+    })
+  })
+  
+  // 4. Stars Range
+  if (repoStore.searchMinStars !== null || repoStore.searchMaxStars !== null) {
+    let label = ''
+    if (repoStore.searchMinStars !== null && repoStore.searchMaxStars !== null) {
+      label = `⭐ ${repoStore.searchMinStars} - ${repoStore.searchMaxStars}`
+    } else if (repoStore.searchMinStars !== null) {
+      label = `⭐ >= ${repoStore.searchMinStars}`
+    } else {
+      label = `⭐ <= ${repoStore.searchMaxStars}`
+    }
+    filters.push({
+      type: 'stars',
+      key: 'stars',
+      label,
+      color: '#f59e0b'
+    })
+  }
+  
+  return filters
+})
+
+const hasActiveFilters = computed(() => activeFilters.value.length > 0)
+
+const removeFilter = (filter: any) => {
+  if (filter.type === 'filterType') {
+    repoStore.setFilterType('all')
+  } else if (filter.type === 'tag') {
+    const newTags = repoStore.searchTags.filter(id => id !== filter.key)
+    repoStore.setSearchTags(newTags)
+  } else if (filter.type === 'language') {
+    const newLangs = repoStore.searchLanguages.filter(l => l !== filter.key)
+    repoStore.setSearchLanguages(newLangs)
+  } else if (filter.type === 'stars') {
+    repoStore.setSearchMinStars(null)
+    repoStore.setSearchMaxStars(null)
+  }
+}
+
+const handleClearAllFilters = () => {
+  repoStore.resetFilters()
+}
+
+// --- 内联高级筛选面板相关逻辑 ---
+const showFilterPanel = ref(false)
+
+const searchMinStars = computed({
+  get: () => repoStore.searchMinStars,
+  set: (val) => repoStore.setSearchMinStars(val)
+})
+
+const searchMaxStars = computed({
+  get: () => repoStore.searchMaxStars,
+  set: (val) => repoStore.setSearchMaxStars(val)
+})
+
+const filterType = computed({
+  get: () => repoStore.filterType,
+  set: (val) => repoStore.setFilterType(val)
+})
+
+const activeFiltersCount = computed(() => {
+  let count = 0
+  if (repoStore.searchTags.length > 0) count += repoStore.searchTags.length
+  if (repoStore.searchLanguages.length > 0) count += repoStore.searchLanguages.length
+  if (repoStore.searchMinStars !== null) count++
+  if (repoStore.searchMaxStars !== null) count++
+  if (repoStore.filterType === 'untagged') count++
+  return count
+})
+
+const currentStarsPreset = computed(() => {
+  const min = repoStore.searchMinStars
+  const max = repoStore.searchMaxStars
+  if (min === null && max === null) return 'all'
+  if (min === 1000 && max === null) return '1k'
+  if (min === 5000 && max === null) return '5k'
+  if (min === 10000 && max === null) return '10k'
+  return 'custom'
+})
+
+const applyStarsPreset = (preset: 'all' | '1k' | '5k' | '10k') => {
+  if (preset === 'all') {
+    repoStore.setSearchMinStars(null)
+    repoStore.setSearchMaxStars(null)
+  } else if (preset === '1k') {
+    repoStore.setSearchMinStars(1000)
+    repoStore.setSearchMaxStars(null)
+  } else if (preset === '5k') {
+    repoStore.setSearchMinStars(5000)
+    repoStore.setSearchMaxStars(null)
+  } else if (preset === '10k') {
+    repoStore.setSearchMinStars(10000)
+    repoStore.setSearchMaxStars(null)
+  }
+}
 // const syncProgress = computed(() => repoStore.syncProgress)
 
 // 批量选择相关
@@ -381,13 +631,18 @@ const handleSizeChange = (size: number) => {
 
 <style lang="scss" scoped>
 .repo-list {
-  width: 480px;
-  min-width: 400px;
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
-  border-right: 1px solid var(--border);
+  border-right: none;
+
+  &.is-detail-open {
+    border-right: 1px solid var(--border);
+    width: 100% !important;
+    min-width: 0 !important;
+  }
 
   // 深色模式下使用与应用一致的背景色
   [data-theme='dark'] & {
@@ -500,6 +755,278 @@ const handleSizeChange = (size: number) => {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+  .filter-toggle-btn {
+    position: relative;
+    
+    &.is-active {
+      color: var(--el-color-primary) !important;
+      background-color: var(--bg-tertiary) !important;
+      font-weight: 600;
+    }
+    
+    .filter-count-badge {
+      position: absolute;
+      top: -2px;
+      right: -4px;
+      background-color: var(--el-color-primary);
+      color: #ffffff;
+      font-size: 8px;
+      font-weight: 700;
+      height: 14px;
+      min-width: 14px;
+      padding: 0 3px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+.inline-filter-panel {
+  padding: 14px 18px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.02);
+
+  [data-theme='dark'] & {
+    background-color: #252d3d !important;
+    border-bottom-color: rgba(96, 165, 250, 0.15) !important;
+    box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+
+    .row-label {
+      width: 56px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding-top: 4px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .row-content {
+      flex: 1;
+      
+      .filter-radio-group {
+        display: flex;
+        width: 100%;
+        
+        :deep(.el-radio-button) {
+          flex: 1;
+          .el-radio-button__inner {
+            width: 100%;
+            text-align: center;
+            border-radius: 0;
+          }
+          &:first-child .el-radio-button__inner {
+            border-radius: 4px 0 0 4px;
+          }
+          &:last-child .el-radio-button__inner {
+            border-radius: 0 4px 4px 0;
+          }
+        }
+      }
+      
+      &.tags-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-height: 100px;
+        overflow-y: auto;
+        padding-right: 4px;
+        padding-bottom: 2px;
+
+        &::-webkit-scrollbar {
+          width: 4px;
+        }
+        &::-webkit-scrollbar-thumb {
+          background: var(--border);
+          border-radius: 2px;
+        }
+
+        .tag-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 10px;
+          border-radius: 12px;
+          font-size: 0.725rem;
+          cursor: pointer;
+          border: 1px solid var(--border);
+          background-color: var(--bg-primary);
+          color: var(--text-secondary);
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          user-select: none;
+
+          [data-theme='dark'] & {
+            border-color: rgba(255, 255, 255, 0.08);
+          }
+
+          &:hover {
+            border-color: var(--tag-color);
+            color: var(--tag-color);
+          }
+
+          &.is-selected {
+            background-color: var(--tag-bg-selected);
+            border-color: var(--tag-border-selected);
+            color: var(--tag-color);
+            font-weight: 600;
+          }
+        }
+
+        .empty-inline-tip {
+          font-size: 0.75rem;
+          color: var(--text-tertiary);
+          padding: 4px 0;
+        }
+      }
+
+      .lang-select-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .lang-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+      }
+
+      &.stars-filter-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        .stars-presets {
+          display: flex;
+          gap: 6px;
+
+          .preset-btn {
+            flex: 1;
+            padding: 4px 0;
+            border-radius: 6px;
+            font-size: 0.725rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            [data-theme='dark'] & {
+              border-color: rgba(255, 255, 255, 0.08);
+            }
+
+            &:hover {
+              border-color: var(--el-color-primary);
+              color: var(--el-color-primary);
+            }
+
+            &.active {
+              background-color: rgba(64, 158, 255, 0.1);
+              border-color: var(--el-color-primary);
+              color: var(--el-color-primary);
+              font-weight: 600;
+            }
+          }
+        }
+
+        .stars-custom-range {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .range-connector {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+          }
+
+          .custom-stars-input {
+            flex: 1;
+            
+            :deep(.el-input__wrapper) {
+              background-color: var(--bg-primary) !important;
+              box-shadow: 0 0 0 1px var(--border) inset !important;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+.active-filters-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+
+  [data-theme='dark'] & {
+    background-color: #252d3d !important;
+    border-bottom-color: rgba(96, 165, 250, 0.15) !important;
+  }
+
+  .filters-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+
+    .filter-badge-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      border-radius: 12px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      
+      .lang-badge-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 2px;
+      }
+
+      :deep(.el-tag__close) {
+        margin-left: 2px;
+        color: inherit;
+        
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.1);
+        }
+      }
+    }
+  }
+
+  .clear-all-filters-btn {
+    font-size: 0.75rem;
+    padding: 0 4px;
+    height: auto;
+    flex-shrink: 0;
+    
+    &:hover {
+      color: var(--el-color-danger) !important;
+      opacity: 0.8;
+    }
   }
 }
 
@@ -656,9 +1183,23 @@ const handleSizeChange = (size: number) => {
 }
 
 .repo-items {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: $spacing-sm;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @media (min-width: 1600px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .repo-list.is-detail-open & {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
 }
 
 :deep(.el-dropdown-menu__item) {

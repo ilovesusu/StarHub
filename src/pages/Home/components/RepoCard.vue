@@ -24,9 +24,23 @@
       </span>
     </div>
 
-    <p v-if="repo.description" class="repo-description">
+    <!-- AI 一句话摘要 -->
+    <div v-if="repo.ai_summary" class="repo-ai-summary">
+      <span class="ai-badge">
+        <span class="ai-sparkle">🪄</span> AI 摘要
+      </span>
+      <p class="summary-text">{{ repo.ai_summary }}</p>
+    </div>
+    <p v-else-if="repo.description" class="repo-description">
       {{ repo.description }}
     </p>
+
+    <!-- AI 细粒度标签 -->
+    <div v-if="repo.ai_tags && repo.ai_tags.length > 0" class="repo-ai-tags">
+      <span v-for="tag in repo.ai_tags" :key="tag" class="ai-tag-item">
+        #{{ tag }}
+      </span>
+    </div>
 
     <RepoCardTags
       v-if="repo.id"
@@ -48,7 +62,7 @@
           {{ repo.language }}
         </span>
         <span class="repo-updated">
-          {{ t('repo.updated') }} {{ formatDate(repo.updated_at) }}
+          {{ t('repo.updated') }} {{ formatDate(repo.updated_at, locale) }}
         </span>
       </div>
       <div class="repo-stats">
@@ -74,7 +88,7 @@ import type { Repository } from '@/types'
 import { Star, Collection, ForkSpoon } from '@element-plus/icons-vue'
 import RepoCardTags from './RepoCardTags.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   repo: Repository
@@ -216,6 +230,67 @@ watch(() => props.repo.id, () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.repo-ai-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: $spacing-sm;
+  padding: 8px 10px;
+  background: rgba(64, 158, 255, 0.05);
+  border-radius: $radius-sm;
+  border-left: 2px solid var(--el-color-primary);
+
+  [data-theme='dark'] & {
+    background: rgba(64, 158, 255, 0.1);
+  }
+
+  .ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--el-color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    
+    .ai-sparkle {
+      font-size: 0.75rem;
+    }
+  }
+
+  .summary-text {
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+.repo-ai-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  
+  .ai-tag-item {
+    font-size: 0.7rem;
+    color: var(--el-color-primary);
+    opacity: 0.8;
+    background: rgba(64, 158, 255, 0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    transition: all $transition-base;
+    cursor: default;
+    
+    &:hover {
+      opacity: 1;
+      background: rgba(64, 158, 255, 0.15);
+    }
+  }
 }
 
 .repo-footer {

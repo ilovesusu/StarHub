@@ -9,6 +9,12 @@ export const authApi = {
     access_token: string
   }>> {
     return backendHttp.get(`/getToken?code=${code}`)
+  },
+  // 获取 OAuth 配置
+  getConfig(): Promise<AxiosResponse<{
+    CLIENT_ID: string
+  }>> {
+    return backendHttp.get('/config')
   }
 }
 

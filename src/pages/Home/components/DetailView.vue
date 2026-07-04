@@ -1,8 +1,20 @@
 <template>
   <div class="detail-view">
     <div class="detail-content" v-if="repo">
-      <!-- 仓库信息卡片 -->
-      <div class="repo-card">
+      <!-- 仓库详情主卡片 -->
+      <div class="repo-card-new">
+        <el-button
+          type="primary"
+          class="ai-analyze-btn"
+          :loading="isAnalyzing"
+          @click="handleAiAnalyze"
+          round
+          size="small"
+        >
+          <el-icon><Cpu /></el-icon>
+          <span>{{ repo.ai_summary ? '重新 AI 分析' : 'AI 智能整理' }}</span>
+        </el-button>
+
         <el-button
           text
           circle
@@ -11,44 +23,115 @@
         >
           <el-icon><Close /></el-icon>
         </el-button>
+
         <div class="repo-card-header">
-          <div class="repo-info">
-            <h1 class="repo-name">{{ repo.full_name }}</h1>
-            <p v-if="repo.description" class="repo-desc">{{ repo.description }}</p>
-          </div>
-          <a class="github-link" :href="repo.html_url" target="_blank" rel="noopener">
-            <el-icon><Link /></el-icon>
-            <span>GitHub</span>
-          </a>
+          <h1 class="repo-name">{{ repo.full_name }}</h1>
+          <p v-if="repo.description" class="repo-desc">{{ repo.description }}</p>
         </div>
-        
-        <div class="repo-meta">
-          <div class="meta-item" v-if="repo.language">
-            <span class="lang-dot" :style="{ background: getLanguageColor(repo.language) }"></span>
-            <span>{{ repo.language }}</span>
+
+        <!-- AI 中文一句话摘要 -->
+        <div v-if="repo.ai_summary" class="repo-ai-summary-detail">
+          <div class="ai-title">
+            <span class="ai-sparkle">🪄</span>
+            <span>AI 中文摘要</span>
           </div>
-          <div class="meta-item">
-            <el-icon><Star /></el-icon>
-            <span>{{ formatNumber(repo.stargazers_count) }}</span>
+          <p class="ai-content">{{ repo.ai_summary }}</p>
+        </div>
+
+        <!-- AI 特征标签 -->
+        <div v-if="repo.ai_tags && repo.ai_tags.length > 0" class="repo-ai-tags-detail">
+          <span v-for="tag in repo.ai_tags" :key="tag" class="ai-tag-pill">#{{ tag }}</span>
+        </div>
+
+        <!-- GitHub Topics -->
+        <div v-if="repo.topics && repo.topics.length > 0" class="repo-topics">
+          <span v-for="topic in repo.topics" :key="topic" class="topic-tag">{{ topic }}</span>
+        </div>
+
+        <!-- Custom Tags -->
+        <div class="custom-tags-row">
+          <el-tag
+            v-for="tag in repoTags"
+            :key="tag.id"
+            closable
+            size="default"
+            :color="tag.color + '1a'"
+            :style="{ borderColor: tag.color, color: tag.color }"
+            class="custom-tag-item"
+            @close="handleRemoveTag(tag.id)"
+          >
+            <span v-if="tag.emoji" class="tag-emoji">{{ tag.emoji }}</span>
+            <span class="tag-name-text">{{ tag.name }}</span>
+          </el-tag>
+          <el-button
+            size="small"
+            circle
+            class="add-tag-btn"
+            @click="showTagDialog = true"
+            title="添加分类"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
+
+        <!-- Stats Grid Bar -->
+        <div class="repo-stats-grid">
+          <div class="stat-card">
+            <div class="stat-value">{{ formatNumber(repo.stargazers_count) }}</div>
+            <div class="stat-label">
+              <el-icon><Star /></el-icon> Stars
+            </div>
           </div>
-          <div class="meta-item">
-            <el-icon><ForkSpoon /></el-icon>
-            <span>{{ formatNumber(repo.forks_count) }}</span>
+          <div class="stat-card">
+            <div class="stat-value">{{ formatNumber(repo.forks_count) }}</div>
+            <div class="stat-label">
+              <el-icon><ForkSpoon /></el-icon> Forks
+            </div>
           </div>
-          <div class="meta-item" v-if="repo.license">
-            <span class="license-badge">{{ repo.license.spdx_id || 'License' }}</span>
+          <div class="stat-card" v-if="repo.open_issues_count !== undefined">
+            <div class="stat-value">{{ formatNumber(repo.open_issues_count) }}</div>
+            <div class="stat-label">
+              <el-icon><InfoFilled /></el-icon> Issues
+            </div>
           </div>
-          <div class="meta-item updated">
-            Updated {{ formatDate(repo.updated_at) }}
+          <div class="stat-card" v-if="repo.language">
+            <div class="stat-value lang-value">
+              <span class="lang-dot" :style="{ background: getLanguageColor(repo.language) }"></span>
+              {{ repo.language }}
+            </div>
+            <div class="stat-label">Language</div>
+          </div>
+        </div>
+
+        <!-- Actions Row -->
+        <div class="repo-actions-row">
+          <div class="action-buttons-group">
+            <a class="action-btn github-btn" :href="repo.html_url" target="_blank" rel="noopener">
+              <el-icon><Link /></el-icon>
+              <span>Open in GitHub</span>
+            </a>
+            <el-button 
+              type="danger" 
+              plain
+              round
+              class="unstar-btn"
+              @click="handleUnstar"
+            >
+              <el-icon><Star /></el-icon>
+              <span>Unstar</span>
+            </el-button>
+          </div>
+          <div class="meta-updated">
+            Updated {{ formatDate(repo.updated_at, locale) }}
           </div>
         </div>
       </div>
 
-      <!-- README -->
+      <!-- README Section -->
       <div class="readme-section" v-if="readme">
         <div class="readme-header">
           <el-icon><Document /></el-icon>
-          <span>README</span>
+          <span>README.md</span>
         </div>
         <div class="readme-content markdown-body" :data-color-mode="themeStore.theme" data-light-theme="light" data-dark-theme="dark" v-html="readme"></div>
       </div>
@@ -93,8 +176,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useTagStore } from '@/stores/tag'
+import { useRepoStore } from '@/stores/repo'
 import { useThemeStore } from '@/stores/theme'
 import { githubApi } from '@/api/github'
 import { getLanguageColor } from '@/utils/languageColors'
@@ -117,7 +202,11 @@ import {
   Close,
   Document,
   Link,
-  ForkSpoon
+  ForkSpoon,
+  Star,
+  Plus,
+  InfoFilled,
+  Cpu
 } from '@element-plus/icons-vue'
 
 // 配置 marked 使用 GFM 扩展和代码高亮
@@ -138,20 +227,108 @@ marked.use(
 )
 
 const themeStore = useThemeStore()
+const { locale } = useI18n()
 
 const props = defineProps<{
   repo: Repository
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
 }>()
 
 const tagStore = useTagStore()
+const repoStore = useRepoStore()
+import { ElMessageBox, ElMessage } from 'element-plus'
 const repoTags = ref<Tag[]>([])
 const readme = ref('')
 const showTagDialog = ref(false)
 const selectedTagId = ref('')
+const isAnalyzing = ref(false)
+
+const handleAiAnalyze = async () => {
+  isAnalyzing.value = true
+  try {
+    const { analyzeRepository, CATEGORY_COLORS } = await import('@/services/ai')
+    
+    // 1. 获取 README 预览 (已加载 readme 则用已有的，未加载则现场拉取)
+    let readmeText = ''
+    try {
+      const [owner, name] = props.repo.full_name.split('/')
+      const readmeRes = await githubApi.getReadme(owner, name)
+      readmeText = readmeRes.data.substring(0, 1000)
+    } catch (e) {
+      // 忽略 readme 获取错误，降级
+    }
+
+    // 2. 调用单仓库分析
+    const analysis = await analyzeRepository(props.repo, readmeText)
+    
+    // 3. 更新仓库本身的 AI 字段
+    await repoStore.updateRepoAIInfo(props.repo.id, {
+      ai_summary: analysis.summary,
+      ai_tags: analysis.tags
+    })
+
+    // 4. 将仓库归类到对应的分类中（1-3个分类）
+    const { getCategoryPresets } = await import('@/config/categories')
+    const presets = getCategoryPresets()
+    const presetMap = new Map<string, { emoji?: string, color: string }>()
+    presets.forEach(preset => {
+      presetMap.set(preset.name, { emoji: preset.emoji, color: preset.color })
+      if (preset.nameEn) {
+        presetMap.set(preset.nameEn, { emoji: preset.emoji, color: preset.color })
+      }
+    })
+
+    for (const categoryName of analysis.categories) {
+      if (!categoryName) continue
+      
+      // 移除分类名称中的描述部分和 emoji（如果有）
+      let cleanCategoryName = categoryName.split(' - ')[0].trim()
+      // 移除开头的 emoji（如果存在）
+      cleanCategoryName = cleanCategoryName.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/u, '').trim()
+      if (!cleanCategoryName) continue
+
+      // 从预设分类中查找对应的 emoji 和颜色
+      const presetInfo = presetMap.get(cleanCategoryName) || presetMap.get(categoryName)
+      const emoji = presetInfo?.emoji
+      const color = presetInfo?.color || CATEGORY_COLORS[cleanCategoryName] || CATEGORY_COLORS[categoryName] || '#9e9e9e'
+
+      // 检查分类是否已存在（精确匹配名称）
+      let existingTag = tagStore.tags.find((t: any) => 
+        t.name === cleanCategoryName || t.name === categoryName
+      )
+
+      if (existingTag) {
+        // 更新现有分类（合并仓库 ID，更新 emoji 如果存在）
+        const mergedRepoIds = Array.from(new Set([...(existingTag.repos || []), props.repo.id]))
+        const updates: any = { repos: mergedRepoIds }
+        if (emoji && existingTag.emoji !== emoji) {
+          updates.emoji = emoji
+        }
+        await tagStore.updateTag(existingTag.id, updates)
+      } else {
+        // 创建新分类（包含 emoji）
+        const newTag = await tagStore.createTag(cleanCategoryName, color, emoji)
+        await tagStore.updateTag(newTag.id, {
+          repos: [props.repo.id]
+        })
+      }
+    }
+
+    // 重新加载分类以刷新 UI
+    await tagStore.loadTags()
+    await loadRepoTags()
+    
+    ElMessage.success('AI 分析与分类完成！')
+  } catch (error: any) {
+    console.error('AI analysis failed:', error)
+    ElMessage.error(error.message || 'AI 分析失败，请检查 AI API 配置')
+  } finally {
+    isAnalyzing.value = false
+  }
+}
 
 const availableTags = computed(() => {
   const currentTagIds = repoTags.value.map((t) => t.id)
@@ -199,6 +376,7 @@ const loadReadme = async () => {
     })
   } catch (error) {
     console.error('Failed to load README:', error)
+    readme.value = ''
   }
 }
 
@@ -219,18 +397,51 @@ const handleAddTag = async () => {
   }
 }
 
-// const handleRemoveTag = async (tagId: string) => {
-//   try {
-//     await tagStore.removeTagFromRepo(props.repo.id, tagId)
-//     await loadRepoTags()
-//   } catch (error) {
-//     console.error('Failed to remove tag:', error)
-//   }
-// }
+const handleRemoveTag = async (tagId: string) => {
+  try {
+    await tagStore.removeTagFromRepo(props.repo.id, tagId)
+    await loadRepoTags()
+  } catch (error) {
+    console.error('Failed to remove tag:', error)
+  }
+}
 
-// const openInGitHub = () => {
-//   window.open(props.repo.html_url, '_blank')
-// }
+const handleUnstar = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要取消 Star 仓库 "${props.repo.full_name}" 吗？这将会从您的 GitHub Star 列表中移除。`,
+      '取消 Star',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await repoStore.unstarRepo(props.repo.id)
+    ElMessage.success('成功取消 Star')
+    emit('close')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Failed to unstar repository:', error)
+      ElMessage.error('取消 Star 失败')
+    }
+  }
+}
+
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 
 watch(
   () => props.repo,
@@ -256,6 +467,7 @@ watch(() => themeStore.theme, () => {
   flex: 1;
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg-primary);
   position: relative;
   
@@ -266,32 +478,64 @@ watch(() => themeStore.theme, () => {
 }
 
 .detail-content {
-  padding: $spacing-md;
-  max-width: 100%;
-  margin: 0;
+  padding: $spacing-lg;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
-// 仓库信息卡片
-.repo-card {
+// 仓库信息主卡片
+.repo-card-new {
   position: relative;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 16px;
-  padding-top: 12px;
-  margin-bottom: 16px;
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
+  margin-bottom: $spacing-xl;
+  box-shadow: $shadow-sm;
   
   // 深色模式下使用与应用一致的背景色
   [data-theme='dark'] & {
     background: #252d3d !important;
-    border-color: rgba(96, 165, 250, 0.2) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.ai-analyze-btn {
+  position: absolute;
+  top: 16px;
+  right: 56px;
+  z-index: 10;
+  background: linear-gradient(135deg, var(--el-color-primary), #6366f1) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  transition: all 0.3s ease;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+    background: linear-gradient(135deg, var(--el-color-primary-light-3), #818cf8) !important;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+  
+  :deep(.el-icon) {
+    font-size: 14px;
   }
 }
 
 .close-button {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 16px;
+  right: 16px;
   z-index: 10;
   color: var(--text-tertiary);
   
@@ -302,107 +546,284 @@ watch(() => themeStore.theme, () => {
 }
 
 .repo-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: $spacing-md;
+  padding-right: 160px;
 }
 
-.repo-info {
-  flex: 1;
-  min-width: 0;
+.repo-ai-summary-detail {
+  margin-bottom: $spacing-md;
+  padding: $spacing-md;
+  background: rgba(64, 158, 255, 0.05);
+  border-radius: $radius-md;
+  border-left: 3px solid var(--el-color-primary);
+
+  [data-theme='dark'] & {
+    background: rgba(64, 158, 255, 0.1);
+  }
+
+  .ai-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--el-color-primary);
+    margin-bottom: 6px;
+    
+    .ai-sparkle {
+      font-size: 0.9rem;
+    }
+  }
+
+  .ai-content {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+.repo-ai-tags-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: $spacing-md;
+
+  .ai-tag-pill {
+    font-size: 0.75rem;
+    color: var(--el-color-primary);
+    background: rgba(64, 158, 255, 0.08);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+    transition: all $transition-base;
+    cursor: default;
+
+    &:hover {
+      background: rgba(64, 158, 255, 0.15);
+      transform: translateY(-1px);
+    }
+  }
 }
 
 .repo-name {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--el-color-primary);
-  margin: 0 0 6px 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
   word-break: break-word;
+  line-height: 1.3;
 }
 
 .repo-desc {
-  font-size: 0.85rem;
+  font-size: 0.925rem;
   color: var(--text-secondary);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-.github-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--el-color-primary);
-  color: #fff;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: all 0.2s;
-  flex-shrink: 0;
+// GitHub Topics
+.repo-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: $spacing-lg;
   
-  &:hover {
-    background: var(--el-color-primary-dark-2);
-  }
-  
-  .el-icon {
-    font-size: 14px;
+  .topic-tag {
+    padding: 3px 10px;
+    background: rgba(64, 158, 255, 0.08);
+    color: var(--el-color-primary);
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all $transition-base;
+    cursor: default;
+
+    &:hover {
+      background: rgba(64, 158, 255, 0.15);
+    }
   }
 }
 
-.repo-meta {
+// 自定义分类标签行
+.custom-tags-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  gap: 8px;
+  margin-bottom: $spacing-xl;
+  padding-bottom: $spacing-md;
+  border-bottom: 1px solid var(--border);
+
+  [data-theme='dark'] & {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .custom-tag-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 4px 10px;
+
+    .tag-emoji {
+      font-size: 0.95rem;
+    }
+  }
+
+  .add-tag-btn {
+    border-style: dashed;
+    background: transparent;
+    color: var(--text-secondary);
+    
+    &:hover {
+      color: var(--el-color-primary);
+      border-color: var(--el-color-primary);
+    }
+  }
 }
 
-.meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  
-  .el-icon {
-    font-size: 14px;
-    color: var(--text-tertiary);
+// 统计格子网格
+.repo-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin-bottom: $spacing-xl;
+
+  .stat-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    transition: transform $transition-base, border-color $transition-base;
+    min-width: 0;
+
+    [data-theme='dark'] & {
+      background: #1c2333 !important;
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    &:hover {
+      transform: translateY(-2px);
+      border-color: var(--el-color-primary);
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      width: 100%;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      &.lang-value {
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        box-sizing: border-box;
+      }
+    }
+
+    .stat-label {
+      font-size: 0.775rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      .el-icon {
+        font-size: 12px;
+        color: var(--text-tertiary);
+        flex-shrink: 0;
+      }
+    }
   }
-  
-  &.updated {
-    margin-left: auto;
+}
+
+// 操作与更新时间
+.repo-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+
+  .action-buttons-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .unstar-btn {
+    box-shadow: 0 2px 6px rgba(245, 108, 108, 0.1);
+    height: 36px;
+    font-weight: 600;
+    
+    &:hover {
+      box-shadow: 0 4px 12px rgba(245, 108, 108, 0.25);
+    }
+  }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all $transition-base;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(64, 158, 255, 0.2);
+
+    &.github-btn {
+      background: var(--el-color-primary);
+      color: #ffffff;
+
+      &:hover {
+        background: var(--el-color-primary-dark-2);
+        box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+      }
+    }
+  }
+
+  .meta-updated {
     font-size: 0.8rem;
     color: var(--text-tertiary);
+    font-weight: 500;
   }
 }
 
-.lang-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.license-badge {
-  padding: 2px 8px;
-  background: var(--bg-tertiary);
-  border-radius: 2px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
+// README 区域
 .readme-section {
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: $radius-lg;
   overflow: hidden;
+  box-shadow: $shadow-sm;
   
-  // 深色模式下使用与应用一致的边框色
   [data-theme='dark'] & {
-    border-color: rgba(96, 165, 250, 0.2) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
 }
 
@@ -410,17 +831,16 @@ watch(() => themeStore.theme, () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 16px 24px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
   
-  // 深色模式下使用与应用一致的背景色
   [data-theme='dark'] & {
     background: #252d3d !important;
-    border-bottom-color: rgba(96, 165, 250, 0.2) !important;
+    border-bottom-color: rgba(96, 165, 250, 0.15) !important;
   }
   
   .el-icon {
@@ -429,16 +849,14 @@ watch(() => themeStore.theme, () => {
 }
 
 .readme-content {
-  // github-markdown-css 提供了 .markdown-body 的所有样式
-  padding: 16px;
+  padding: 24px;
   box-sizing: border-box;
   min-width: 200px;
   max-width: 100%;
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   
-  // 深色模式下使用与应用一致的背景色
   [data-theme='dark'] & {
-    background: #1c2333 !important;
+    background: #252d3d !important;
   }
   
   // 徽章对齐
@@ -455,7 +873,6 @@ watch(() => themeStore.theme, () => {
     }
   }
   
-  // 图片加载失败时的占位
   :deep(img) {
     max-width: 100%;
     
@@ -468,7 +885,7 @@ watch(() => themeStore.theme, () => {
   // 代码块样式
   :deep(pre) {
     background: #f6f8fa;
-    border-radius: 3px;
+    border-radius: 6px;
     padding: 16px;
     overflow: auto;
     
@@ -483,7 +900,7 @@ watch(() => themeStore.theme, () => {
   
   // 暗色主题
   &[data-color-mode='dark'] {
-    background: #0d1117;
+    background: #1c2333;
     color: #c9d1d9;
     border-color: #30363d;
     
@@ -507,7 +924,7 @@ watch(() => themeStore.theme, () => {
     }
     
     :deep(pre) {
-      background: #161b22;
+      background: #0d1117;
       
       code {
         background: transparent;
@@ -525,11 +942,11 @@ watch(() => themeStore.theme, () => {
       }
       
       tr {
-        background: #0d1117;
+        background: #1c2333;
         border-color: #30363d;
         
         &:nth-child(2n) {
-          background: #161b22;
+          background: #0d1117;
         }
       }
     }
@@ -615,6 +1032,13 @@ watch(() => themeStore.theme, () => {
   width: 10px;
   height: 10px;
   border-radius: $radius-round;
+}
+
+.lang-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 </style>
 

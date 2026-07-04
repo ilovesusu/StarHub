@@ -22,18 +22,43 @@ export const formatNumber = (num: number): string => {
   return num.toString()
 }
 
-export const formatDate = (dateString: string): string => {
+export const formatDate = (dateString: string | number | Date, lang: string = 'zh'): string => {
   const date = new Date(dateString)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
 
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days ago`
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`
-  if (days < 365) return `${Math.floor(days / 30)} months ago`
-  return `${Math.floor(days / 365)} years ago`
+  const isZh = lang === 'zh'
+
+  if (seconds < 60) {
+    return isZh ? '刚刚' : 'just now'
+  }
+  if (minutes < 60) {
+    return isZh ? `${minutes} 分钟前` : `${minutes}m ago`
+  }
+  if (hours < 24) {
+    return isZh ? `${hours} 小时前` : `${hours}h ago`
+  }
+  if (days === 1) {
+    return isZh ? '昨天' : 'yesterday'
+  }
+  if (days < 7) {
+    return isZh ? `${days} 天前` : `${days} days ago`
+  }
+  if (days < 30) {
+    const weeks = Math.floor(days / 7)
+    return isZh ? `${weeks} 周前` : `${weeks} weeks ago`
+  }
+  if (days < 365) {
+    const months = Math.floor(days / 30)
+    return isZh ? `${months} 个月前` : `${months} months ago`
+  }
+  const years = Math.floor(days / 365)
+  return isZh ? `${years} 年前` : `${years} years ago`
 }
 
 export const downloadString = (
