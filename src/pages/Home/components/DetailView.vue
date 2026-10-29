@@ -188,7 +188,7 @@ import { marked } from 'marked'
 import { gfmHeadingId } from 'marked-gfm-heading-id'
 import { mangle } from 'marked-mangle'
 import { markedHighlight } from 'marked-highlight'
-import hljs from 'highlight.js'
+import hljs from 'highlight.js/lib/common'
 
 // 导入 highlight.js GitHub 样式
 import 'highlight.js/styles/github.css'

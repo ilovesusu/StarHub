@@ -364,13 +364,49 @@ export interface CategoryPreset {
 
 export const DEFAULT_CATEGORIES: CategoryPreset[] = [
   {
+    name: 'AI / 大模型',
+    nameEn: 'AI & LLM',
+    emoji: '🤖',
+    description: '大语言模型、Agent 智能体、RAG、Prompt 工具及 AI 应用',
+    descriptionEn: 'LLMs, AI agents, RAG, prompt engineering, and AI applications',
+    color: '#8e44ad',
+    keywords: ['ai', 'llm', 'agent', 'gpt', 'openai', 'claude', 'ollama', 'rag', 'langchain', 'mcp', 'prompt', 'transformer', 'lora', 'comfyui', 'copilot', 'deep-learning', 'machine-learning', 'neural-network']
+  },
+  {
     name: 'Web 开发',
     nameEn: 'Web Development',
     emoji: '🌐',
     description: '前端、后端、全栈 Web 应用和框架',
     descriptionEn: 'Frontend, backend, full-stack web applications and frameworks',
     color: '#42b883',
-    keywords: ['web', 'frontend', 'backend', 'react', 'vue', 'angular', 'svelte', 'next', 'nuxt', 'express', 'koa', 'fastify', 'nestjs']
+    keywords: ['web', 'frontend', 'backend', 'fullstack', 'html', 'css', 'javascript', 'typescript', 'express', 'koa', 'fastify', 'nestjs', 'api', 'http']
+  },
+  {
+    name: '桌面应用',
+    nameEn: 'Desktop Apps',
+    emoji: '🖥️',
+    description: '跨平台桌面客户端、GUI 应用程序及扩展',
+    descriptionEn: 'Cross-platform desktop clients, GUI applications and extensions',
+    color: '#2980b9',
+    keywords: ['desktop', 'electron', 'tauri', 'flutter-desktop', 'gui', 'app', 'client', 'window', 'cross-platform', 'qt']
+  },
+  {
+    name: 'CLI / 终端',
+    nameEn: 'CLI & Terminal',
+    emoji: '🐚',
+    description: '命令行工具、Shell 扩展、终端效率神器及脚本',
+    descriptionEn: 'Command-line tools, shell extensions, terminal utilities and scripts',
+    color: '#16a085',
+    keywords: ['cli', 'terminal', 'command-line', 'shell', 'zsh', 'bash', 'tui', 'script', 'console', 'utility', 'tmux']
+  },
+  {
+    name: '自建服务',
+    nameEn: 'Self-Hosted',
+    emoji: '🏠',
+    description: 'Self-Hosted 部署应用、Homelab、私有云及服务',
+    descriptionEn: 'Self-hosted applications, homelab setups, and private cloud services',
+    color: '#e67e22',
+    keywords: ['self-hosted', 'homelab', 'docker-compose', 'server', 'nas', 'private-cloud', 'dashboard', 'proxy', 'gateway', 'media-server']
   },
   {
     name: '移动开发',
@@ -379,151 +415,160 @@ export const DEFAULT_CATEGORIES: CategoryPreset[] = [
     description: 'iOS、Android、跨平台移动应用',
     descriptionEn: 'iOS, Android, cross-platform mobile applications',
     color: '#34a853',
-    keywords: ['mobile', 'android', 'ios', 'react-native', 'flutter', 'swift', 'kotlin', 'xamarin']
+    keywords: ['mobile', 'android', 'ios', 'react-native', 'flutter', 'swift', 'kotlin', 'xamarin', 'expo']
   },
   {
     name: '数据科学',
     nameEn: 'Data Science',
-    emoji: '🤖',
-    description: '机器学习、深度学习、数据分析',
-    descriptionEn: 'Machine learning, deep learning, data analytics',
+    emoji: '📊',
+    description: '数据分析、科研绘图、数据可视化与挖掘',
+    descriptionEn: 'Data analysis, scientific plotting, data visualization and mining',
     color: '#ff9800',
-    keywords: ['machine-learning', 'ml', 'ai', 'deep-learning', 'tensorflow', 'pytorch', 'pandas', 'numpy', 'data', 'analytics']
+    keywords: ['data-science', 'analytics', 'visualization', 'matplotlib', 'pandas', 'numpy', 'jupyter', 'scikit-learn', 'statistics', 'chart']
   },
   {
     name: '工具库',
     nameEn: 'Tools & Libraries',
     emoji: '🛠️',
-    description: '通用工具、库、框架',
-    descriptionEn: 'General tools, libraries, frameworks',
+    description: '通用工具、库、框架及 SDK',
+    descriptionEn: 'General tools, libraries, frameworks and SDKs',
     color: '#9c27b0',
-    keywords: ['library', 'framework', 'util', 'helper', 'tool', 'sdk', 'api']
+    keywords: ['library', 'framework', 'util', 'helper', 'tool', 'sdk', 'api', 'package', 'plugin', 'middleware']
   },
   {
     name: 'DevOps',
     nameEn: 'DevOps',
     emoji: '⚙️',
-    description: 'CI/CD、容器化、基础设施',
-    descriptionEn: 'CI/CD, containerization, infrastructure',
+    description: 'CI/CD、容器化、基础设施及运维工具',
+    descriptionEn: 'CI/CD, containerization, infrastructure and ops tools',
     color: '#00bcd4',
-    keywords: ['devops', 'docker', 'kubernetes', 'k8s', 'ci', 'cd', 'deploy', 'infrastructure', 'terraform', 'ansible']
+    keywords: ['devops', 'docker', 'kubernetes', 'k8s', 'ci', 'cd', 'deploy', 'infrastructure', 'terraform', 'ansible', 'helm', 'argocd', 'prometheus', 'grafana']
   },
   {
     name: '游戏开发',
     nameEn: 'Game Development',
     emoji: '🎮',
-    description: '游戏引擎、游戏相关工具',
-    descriptionEn: 'Game engines, game-related tools',
+    description: '游戏引擎、图形与游戏相关工具',
+    descriptionEn: 'Game engines, graphics and game-related tools',
     color: '#f44336',
-    keywords: ['game', 'gaming', 'unity', 'unreal', 'godot', 'phaser', 'cocos']
+    keywords: ['game', 'gaming', 'unity', 'unreal', 'godot', 'phaser', 'cocos', 'game-engine', 'opengl', 'webgl', 'vulkan', 'shader']
   },
   {
     name: '数据库',
     nameEn: 'Database',
     emoji: '💾',
-    description: '数据库系统、ORM、数据存储',
-    descriptionEn: 'Database systems, ORM, data storage',
+    description: '数据库系统、ORM、向量存储与数据缓存',
+    descriptionEn: 'Database systems, ORM, vector storage and data caching',
     color: '#ff5722',
-    keywords: ['database', 'sql', 'nosql', 'mongodb', 'postgres', 'mysql', 'redis', 'orm', 'prisma']
+    keywords: ['database', 'sql', 'nosql', 'mongodb', 'postgres', 'mysql', 'redis', 'orm', 'prisma', 'sqlite', 'clickhouse', 'vector-db']
   },
   {
     name: '安全',
     nameEn: 'Security',
     emoji: '🔒',
-    description: '网络安全、加密、认证',
-    descriptionEn: 'Network security, encryption, authentication',
+    description: '网络安全、加密算法、认证及漏洞分析',
+    descriptionEn: 'Network security, encryption, authentication and vulnerability analysis',
     color: '#e91e63',
-    keywords: ['security', 'crypto', 'encryption', 'auth', 'oauth', 'jwt', 'vulnerability']
+    keywords: ['security', 'crypto', 'encryption', 'auth', 'oauth', 'jwt', 'vulnerability', 'penetration', 'firewall', 'sandbox']
   },
   {
     name: '区块链',
     nameEn: 'Blockchain',
     emoji: '⛓️',
-    description: '加密货币、智能合约、Web3',
-    descriptionEn: 'Cryptocurrency, smart contracts, Web3',
+    description: '加密货币、智能合约及 Web3',
+    descriptionEn: 'Cryptocurrency, smart contracts, and Web3',
     color: '#ffc107',
-    keywords: ['blockchain', 'crypto', 'bitcoin', 'ethereum', 'web3', 'smart-contract', 'defi', 'nft']
+    keywords: ['blockchain', 'crypto', 'bitcoin', 'ethereum', 'web3', 'smart-contract', 'defi', 'nft', 'solidity']
   },
   {
     name: '编程语言',
     nameEn: 'Programming Language',
     emoji: '💻',
-    description: '编译器、解释器、语言工具',
-    descriptionEn: 'Compilers, interpreters, language tools',
+    description: '编译器、解释器、语言工具及语法解析',
+    descriptionEn: 'Compilers, interpreters, language tools and syntax parsing',
     color: '#3f51b5',
-    keywords: ['compiler', 'interpreter', 'language', 'parser', 'transpiler', 'babel']
+    keywords: ['compiler', 'interpreter', 'language', 'parser', 'transpiler', 'babel', 'ast', 'syntax']
   },
   {
     name: '系统编程',
     nameEn: 'Systems Programming',
     emoji: '⚡',
-    description: '操作系统、底层开发',
-    descriptionEn: 'Operating systems, low-level development',
+    description: '操作系统、驱动开发、嵌入式与底层系统',
+    descriptionEn: 'Operating systems, driver development, embedded and low-level systems',
     color: '#607d8b',
-    keywords: ['system', 'os', 'kernel', 'driver', 'embedded', 'low-level', 'c', 'rust', 'assembly']
+    keywords: ['system', 'os', 'kernel', 'driver', 'embedded', 'low-level', 'c', 'rust', 'assembly', 'wasm', 'webassembly']
   },
   {
     name: '设计',
     nameEn: 'Design',
     emoji: '🎨',
-    description: 'UI/UX、设计工具、图形处理',
-    descriptionEn: 'UI/UX, design tools, graphics processing',
+    description: 'UI/UX、设计系统、图形处理及动画',
+    descriptionEn: 'UI/UX, design systems, graphics processing and animation',
     color: '#e91e63',
-    keywords: ['design', 'ui', 'ux', 'figma', 'sketch', 'graphics', 'animation', 'svg']
+    keywords: ['design', 'ui', 'ux', 'figma', 'sketch', 'graphics', 'animation', 'svg', 'canvas', 'css-framework', 'theme']
   },
   {
     name: '文档',
     nameEn: 'Documentation',
     emoji: '📚',
-    description: '文档生成、知识管理',
-    descriptionEn: 'Documentation generation, knowledge management',
+    description: '文档生成、知识库及 Markdown 工具',
+    descriptionEn: 'Documentation generation, knowledge base and Markdown tools',
     color: '#795548',
-    keywords: ['documentation', 'docs', 'markdown', 'wiki', 'knowledge', 'readme']
+    keywords: ['documentation', 'docs', 'markdown', 'wiki', 'knowledge', 'readme', 'vitepress', 'docusaurus', 'astro']
   },
   {
     name: '测试',
     nameEn: 'Testing',
     emoji: '🧪',
-    description: '测试框架、自动化测试',
-    descriptionEn: 'Testing frameworks, automated testing',
+    description: '测试框架、自动化测试及 Mock 工具',
+    descriptionEn: 'Testing frameworks, automated testing and mock tools',
     color: '#4caf50',
-    keywords: ['test', 'testing', 'jest', 'mocha', 'cypress', 'selenium', 'automation', 'e2e']
+    keywords: ['test', 'testing', 'jest', 'vitest', 'mocha', 'cypress', 'selenium', 'playwright', 'automation', 'e2e']
   },
   {
     name: 'Awesome',
     nameEn: 'Awesome',
     emoji: '😎',
-    description: '精选资源列表',
-    descriptionEn: 'Curated resource lists',
+    description: '精选资源列表与收集合集',
+    descriptionEn: 'Curated resource lists and collection guides',
     color: '#ff6b6b',
-    keywords: ['awesome', 'curated', 'list', 'resources', 'collection']
+    keywords: ['awesome', 'curated', 'list', 'resources', 'collection', 'cheatsheet', 'bookmarks']
   },
   {
     name: 'Node.js',
     nameEn: 'Node.js',
     emoji: '🟢',
-    description: 'Node.js 生态系统',
-    descriptionEn: 'Node.js ecosystem',
+    description: 'Node.js 生态系统及后端运行时',
+    descriptionEn: 'Node.js ecosystem and backend runtime',
     color: '#339933',
-    keywords: ['nodejs', 'node', 'npm', 'javascript', 'server']
+    keywords: ['nodejs', 'node', 'npm', 'pnpm', 'yarn', 'bun', 'deno', 'javascript', 'server']
   },
   {
-    name: 'Vue',
-    nameEn: 'Vue',
+    name: 'Vue 生态',
+    nameEn: 'Vue Ecosystem',
     emoji: '🟩',
-    description: 'Vue 生态系统',
-    descriptionEn: 'Vue ecosystem',
+    description: 'Vue.js 核心库、插件、UI 库及生态',
+    descriptionEn: 'Vue.js core libraries, plugins, UI kits and ecosystem',
     color: '#42b883',
-    keywords: ['vue', 'vuejs', 'composition-api', 'vuex', 'pinia', 'vite', 'nuxt']
+    keywords: ['vue', 'vuejs', 'composition-api', 'vuex', 'pinia', 'vite', 'nuxt', 'element-plus', 'vuetify', 'naive-ui']
+  },
+  {
+    name: 'React 生态',
+    nameEn: 'React Ecosystem',
+    emoji: '⚛️',
+    description: 'React、Next.js、React Native 及 UI 生态',
+    descriptionEn: 'React, Next.js, React Native, and UI ecosystem',
+    color: '#61dafb',
+    keywords: ['react', 'reactjs', 'nextjs', 'remix', 'gatsby', 'redux', 'zustand', 'shadcn', 'tailwind', 'chakra-ui']
   },
   {
     name: 'Skills',
     nameEn: 'Skills',
     emoji: '🎯',
-    description: '智能代理技能、提示词及扩展包',
-    descriptionEn: 'Agent skills, prompts, and extensions',
-    color: '#8e44ad',
-    keywords: ['skill', 'skills', 'agent', 'prompt', 'mcp', 'capability', 'tool']
+    description: '智能代理技能、提示词、MCP 及扩展包',
+    descriptionEn: 'Agent skills, prompts, MCP, and extensions',
+    color: '#9b59b6',
+    keywords: ['skill', 'skills', 'agent', 'prompt', 'mcp', 'capability', 'tool', 'workflow', 'plugin']
   },
   {
     name: '其他',

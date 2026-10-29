@@ -22,6 +22,19 @@
         <el-icon class="menu-icon"><Collection /></el-icon>
         <span class="menu-text">{{ t('menu.untagged') }}</span>
         <span class="menu-count">{{ untaggedCount }}</span>
+        <el-tooltip content="AI 智能分类未分类的项目" placement="top">
+          <el-button
+            text
+            circle
+            size="small"
+            class="untagged-ai-classify"
+            :loading="isClassifying"
+            :disabled="isClassifying"
+            @click.stop="handleClassifyUntagged"
+          >
+            <el-icon><MagicStick /></el-icon>
+          </el-button>
+        </el-tooltip>
       </div>
     </div>
 
@@ -378,6 +391,14 @@ const handleClassifyLanguage = async (languageName: string) => {
     return
   }
   await handleAutoClassify(false, repos)
+}
+
+const handleClassifyUntagged = async () => {
+  if (repoStore.untaggedRepos.length === 0) {
+    ElMessage.success(t('tag.allClassified'))
+    return
+  }
+  await handleAutoClassify(false)
 }
 
 // 停止分类
@@ -900,6 +921,10 @@ onMounted(() => {
   &:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+
+    .untagged-ai-classify {
+      opacity: 1;
+    }
   }
 
   &.active {
@@ -1116,13 +1141,15 @@ onMounted(() => {
 
 .tag-delete,
 .tag-ai-classify,
-.lang-ai-classify {
+.lang-ai-classify,
+.untagged-ai-classify {
   opacity: 0;
   transition: opacity $transition-base;
 }
 
 .tag-ai-classify,
-.lang-ai-classify {
+.lang-ai-classify,
+.untagged-ai-classify {
   color: var(--text-tertiary) !important;
   margin-left: 2px;
   
