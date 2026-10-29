@@ -4,6 +4,8 @@
       <div class="card-header">
         <span>{{ t('settings.presetCategories') }}</span>
         <div style="display: flex; gap: 8px;">
+          <el-button text @click="showAutoMergeDialog = true">{{ t('tag.autoMerge') }}</el-button>
+          <el-button text @click="handleBeautifyTags">{{ t('tag.beautify') }}</el-button>
           <el-button text @click="handleSyncToTags">{{ t('settings.syncToTags') }}</el-button>
           <el-button text @click="handleResetPresets">{{ t('settings.resetToDefault') }}</el-button>
         </div>
@@ -99,6 +101,12 @@
         <el-button type="primary" @click="handleSavePreset">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 智能自动合并分类建议对话框 -->
+    <AutoMergeDialog
+      v-model="showAutoMergeDialog"
+      :tags="tagStore.tags"
+    />
   </el-card>
 </template>
 
@@ -107,6 +115,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import AutoMergeDialog from '@/pages/Home/components/AutoMergeDialog.vue'
 import {
   getCategoryPresets,
   saveCategoryPresets,
@@ -120,6 +129,7 @@ const tagStore = useTagStore()
 
 const categoryPresets = ref<CategoryPreset[]>([])
 const showAddPresetDialog = ref(false)
+const showAutoMergeDialog = ref(false)
 const editingPreset = ref<string | null>(null)
 const newPreset = ref({
   name: '',
@@ -152,6 +162,19 @@ const handleResetPresets = async () => {
     ElMessage.success(t('settings.resetPresetsSuccess'))
   } catch {
     // 用户取消
+  }
+}
+
+const handleBeautifyTags = async () => {
+  try {
+    const updatedCount = await tagStore.beautifyAllTags()
+    if (updatedCount > 0) {
+      ElMessage.success(t('tag.beautifySuccess', { count: updatedCount }))
+    } else {
+      ElMessage.info('所有分类图标和配色均已是最优状态！')
+    }
+  } catch (error: any) {
+    ElMessage.error(`美化失败: ${error.message || '未知错误'}`)
   }
 }
 

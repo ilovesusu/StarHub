@@ -11,7 +11,11 @@ import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
 import { useThemeStore } from './stores/theme'
+import { runAppMigrations } from './utils/migration'
 import './styles/main.scss'
+
+// 启动平滑数据升级
+runAppMigrations()
 
 const app = createApp(App)
 

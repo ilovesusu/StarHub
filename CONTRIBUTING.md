@@ -21,8 +21,8 @@
 ### 2. 克隆到本地
 
 ```bash
-git clone hhttps://github.com/hujinghaoabcd/StarHub.git
-cd starhub
+git clone https://github.com/ilovesusu/StarHub.git
+cd StarHub
 ```
 
 ### 3. 安装依赖
@@ -262,7 +262,7 @@ git push origin feature/your-feature
 
 ## 🐛 报告 Bug
 
-请通过 [GitHub Issues](https://github.com/hujinghaoabcd/StarHub/issues) 报告 Bug。
+请通过 [GitHub Issues](https://github.com/ilovesusu/StarHub/issues) 报告 Bug。
 
 ### Bug 报告模板
 
@@ -303,7 +303,7 @@ git push origin feature/your-feature
 
 ## 💡 功能建议
 
-欢迎通过 [GitHub Issues](https://github.com/hujinghaoabcd/StarHub/issues) 提出功能建议。
+欢迎通过 [GitHub Issues](https://github.com/ilovesusu/StarHub/issues) 提出功能建议。
 
 ### 功能建议模板
 

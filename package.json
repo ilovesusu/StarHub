@@ -1,11 +1,18 @@
 {
   "name": "starhub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A professional GitHub Stars management application with beautiful UI",
+  "author": "Joy Jasper <0x73757375@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/ilovesusu/StarHub",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ilovesusu/StarHub.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "deploy": "pnpm build && wrangler pages deploy ./dist",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",

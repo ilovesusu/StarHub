@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hujinghaoabcd/StarHub/stargazers"><img src="https://img.shields.io/github/stars/hujinghaoabcd/StarHub?style=flat&logo=github" alt="GitHub Stars"></a>
-  <a href="https://github.com/hujinghaoabcd/StarHub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/hujinghaoabcd/StarHub?style=flat" alt="License"></a>
+  <a href="https://github.com/ilovesusu/StarHub/stargazers"><img src="https://img.shields.io/github/stars/ilovesusu/StarHub?style=flat&logo=github" alt="GitHub Stars"></a>
+  <a href="https://github.com/ilovesusu/StarHub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ilovesusu/StarHub?style=flat" alt="License"></a>
   <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat" alt="Version">
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat&logo=node.js" alt="Node.js">
   <img src="https://img.shields.io/badge/vue-3.4-4FC08D?style=flat&logo=vue.js" alt="Vue.js">
@@ -227,7 +227,7 @@ If you have deployed StarHub, you can access it via:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/hujinghaoabcd/StarHub.git
+git clone https://github.com/ilovesusu/StarHub.git
 cd StarHub
 
 # 2. Install dependencies
@@ -582,14 +582,19 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 📄 License
+## 📄 License & Copyright Notice
 
 This project is licensed under the [MIT License](LICENSE).
+
+- **Current Maintainer**: [Joy Jasper (ilovesusu)](https://github.com/ilovesusu)
+- **Original Project Copyright**: Copyright (c) 2025 Jinghao Hu ([hujinghaoabcd](https://github.com/hujinghaoabcd))
+- **Enhanced Fork Copyright**: Copyright (c) 2026 Joy Jasper ([ilovesusu](https://github.com/ilovesusu))
 
 ---
 
 ## 🙏 Acknowledgments
 
+- Special thanks to original author [Jinghao Hu (hujinghaoabcd)](https://github.com/hujinghaoabcd) for creating and open-sourcing the original StarHub
 - [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
 - [Element Plus](https://element-plus.org/) - Vue 3 component library
 - [Dexie.js](https://dexie.org/) - IndexedDB wrapper library

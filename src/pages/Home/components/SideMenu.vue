@@ -80,6 +80,28 @@
               <el-icon><CircleClose /></el-icon>
             </el-button>
           </el-tooltip>
+          <el-tooltip :content="t('tag.beautifyTip')" placement="top">
+            <el-button
+              text
+              circle
+              size="small"
+              :disabled="isClassifying"
+              @click="handleBeautifyTags"
+            >
+              <el-icon><Brush /></el-icon>
+            </el-button>
+          </el-tooltip>
+          <el-tooltip :content="t('tag.autoMergeTip')" placement="top">
+            <el-button
+              text
+              circle
+              size="small"
+              :disabled="isClassifying"
+              @click="showAutoMergeDialog = true"
+            >
+              <el-icon><Connection /></el-icon>
+            </el-button>
+          </el-tooltip>
           <el-button
             text
             circle
@@ -123,15 +145,27 @@
               <el-icon><MagicStick /></el-icon>
             </el-button>
           </el-tooltip>
-          <el-button
-            text
-            circle
-            size="small"
-            class="tag-delete"
-            @click.stop="handleDeleteTag(tag.id)"
-          >
-            <el-icon><Close /></el-icon>
-          </el-button>
+          <el-dropdown trigger="click" @command="(cmd: string) => handleTagCommand(cmd, tag)" @click.stop>
+            <el-button text circle size="small" class="tag-more-btn">
+              <el-icon><MoreFilled /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="edit">
+                  <el-icon><Edit /></el-icon>
+                  {{ t('tag.edit') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="merge">
+                  <el-icon><Switch /></el-icon>
+                  {{ t('tag.merge') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" divided style="color: var(--el-color-danger);">
+                  <el-icon><Close /></el-icon>
+                  {{ t('common.delete') }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
         <div v-if="tags.length === 0" class="empty-tags">
           {{ t('tag.create') }}
@@ -215,6 +249,89 @@
         <el-button type="primary" @click="handleCreateTag">{{ t('tag.create') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 编辑分类对话框 -->
+    <el-dialog
+      v-model="showEditTagDialog"
+      :title="t('tag.edit')"
+      width="400px"
+    >
+      <el-form :model="editingTag" label-width="80px">
+        <el-form-item :label="t('tag.emoji')">
+          <el-input 
+            v-model="editingTag.emoji" 
+            :placeholder="t('tag.emojiPlaceholder')"
+            maxlength="2"
+            style="width: 100px;"
+          />
+          <div class="form-tip">{{ t('tag.emojiTip') }}</div>
+        </el-form-item>
+        <el-form-item :label="t('tag.name')">
+          <el-input v-model="editingTag.name" :placeholder="t('tag.name')" />
+        </el-form-item>
+        <el-form-item :label="t('tag.color')">
+          <el-color-picker v-model="editingTag.color" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditTagDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveEditTag">{{ t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 合并分类对话框 -->
+    <el-dialog
+      v-model="showMergeTagDialog"
+      :title="t('tag.mergeTitle')"
+      width="460px"
+    >
+      <div v-if="mergeSourceTag" style="margin-bottom: 16px;">
+        <div style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span>{{ t('tag.mergeSource') }}:</span>
+          <el-tag :color="mergeSourceTag.color" style="color: #fff; font-weight: 500;">
+            {{ mergeSourceTag.emoji }} {{ mergeSourceTag.name }}
+          </el-tag>
+          <span style="font-size: 12px; color: var(--text-tertiary);">
+            ({{ mergeSourceTag.repos?.length || 0 }} 个仓库)
+          </span>
+        </div>
+
+        <el-form label-width="90px" style="margin-top: 16px;">
+          <el-form-item :label="t('tag.mergeTarget')">
+            <el-select
+              v-model="mergeTargetTagId"
+              :placeholder="t('tag.mergeTargetPlaceholder')"
+              filterable
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="target in mergeAvailableTargets"
+                :key="target.id"
+                :label="`${target.emoji ? target.emoji + ' ' : ''}${target.name} (${target.repos?.length || 0})`"
+                :value="target.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="mergeDeleteSource">
+              {{ t('tag.mergeDeleteSource') }}
+            </el-checkbox>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="showMergeTagDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!mergeTargetTagId" @click="handleConfirmMerge">
+          {{ t('common.confirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 智能自动合并分类建议对话框 -->
+    <AutoMergeDialog
+      v-model="showAutoMergeDialog"
+      :tags="tagStore.tags"
+    />
   </div>
 </template>
 
@@ -224,9 +341,25 @@ import { useI18n } from 'vue-i18n'
 import { useTagStore } from '@/stores/tag'
 import { useRepoStore } from '@/stores/repo'
 import { getLanguageColor } from '@/utils/languageColors'
-import { Plus, Close, Grid, Collection, Loading, MagicStick, ArrowDown, Refresh, CircleClose } from '@element-plus/icons-vue'
+import {
+  Plus,
+  Close,
+  Grid,
+  Collection,
+  Loading,
+  MagicStick,
+  ArrowDown,
+  Refresh,
+  CircleClose,
+  MoreFilled,
+  Edit,
+  Switch,
+  Brush,
+  Connection
+} from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage, ElNotification } from 'element-plus'
 import type { Repository } from '@/types'
+import AutoMergeDialog from './AutoMergeDialog.vue'
 
 const { t } = useI18n()
 
@@ -235,6 +368,24 @@ const repoStore = useRepoStore()
 
 const showCreateTagDialog = ref(false)
 const newTag = ref({ name: '', emoji: '', color: '#409EFF' })
+
+// 自动合并分类
+const showAutoMergeDialog = ref(false)
+
+// 编辑分类
+const showEditTagDialog = ref(false)
+const editingTag = ref({ id: '', name: '', emoji: '', color: '#409EFF' })
+
+// 合并分类
+const showMergeTagDialog = ref(false)
+const mergeSourceTag = ref<any>(null)
+const mergeTargetTagId = ref('')
+const mergeDeleteSource = ref(true)
+
+const mergeAvailableTargets = computed(() => {
+  if (!mergeSourceTag.value) return tagStore.tags
+  return tagStore.tags.filter(t => t.id !== mergeSourceTag.value.id)
+})
 const filterType = computed(() => repoStore.filterType)
 const reposCount = computed(() => repoStore.repos.length)
 const untaggedCount = computed(() => repoStore.untaggedRepos.length)
@@ -342,6 +493,97 @@ const handleDeleteTag = async (tagId: string) => {
     await tagStore.deleteTag(tagId)
   } catch (error) {
     // User cancelled
+  }
+}
+
+const handleTagCommand = (command: string, tag: any) => {
+  if (command === 'edit') {
+    handleOpenEditTag(tag)
+  } else if (command === 'merge') {
+    handleOpenMergeTag(tag)
+  } else if (command === 'delete') {
+    handleDeleteTag(tag.id)
+  }
+}
+
+const handleOpenEditTag = (tag: any) => {
+  editingTag.value = {
+    id: tag.id,
+    name: tag.name,
+    emoji: tag.emoji || '',
+    color: tag.color || '#409EFF'
+  }
+  showEditTagDialog.value = true
+}
+
+const handleSaveEditTag = async () => {
+  if (!editingTag.value.name.trim()) {
+    ElMessage.warning(t('settings.categoryNameRequired'))
+    return
+  }
+
+  try {
+    await tagStore.updateTag(editingTag.value.id, {
+      name: editingTag.value.name.trim(),
+      emoji: editingTag.value.emoji.trim(),
+      color: editingTag.value.color
+    })
+    showEditTagDialog.value = false
+    ElMessage.success(t('settings.saveSuccess'))
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  }
+}
+
+const handleOpenMergeTag = (tag: any) => {
+  mergeSourceTag.value = tag
+  mergeTargetTagId.value = ''
+  mergeDeleteSource.value = true
+  showMergeTagDialog.value = true
+}
+
+const handleConfirmMerge = async () => {
+  if (!mergeSourceTag.value || !mergeTargetTagId.value) return
+
+  const targetTag = tagStore.tags.find(t => t.id === mergeTargetTagId.value)
+  if (!targetTag) return
+
+  try {
+    await ElMessageBox.confirm(
+      t('tag.mergeConfirm', {
+        source: mergeSourceTag.value.name,
+        count: mergeSourceTag.value.repos?.length || 0,
+        target: targetTag.name
+      }),
+      t('tag.mergeTitle'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
+
+    await tagStore.mergeTags(mergeSourceTag.value.id, targetTag.id, mergeDeleteSource.value)
+    await repoStore.loadRepos()
+    showMergeTagDialog.value = false
+    ElMessage.success(t('tag.mergeSuccess'))
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(`合并失败: ${error.message || '未知错误'}`)
+    }
+  }
+}
+
+const handleBeautifyTags = async () => {
+  try {
+    const updatedCount = await tagStore.beautifyAllTags()
+    if (updatedCount > 0) {
+      ElMessage.success(t('tag.beautifySuccess', { count: updatedCount }))
+    } else {
+      ElMessage.info('所有分类图标和配色均已是最优状态！')
+    }
+  } catch (error: any) {
+    ElMessage.error(`美化失败: ${error.message || '未知错误'}`)
   }
 }
 
@@ -741,10 +983,12 @@ const handleAutoClassify = async (reclassifyAll = false, customRepos?: Repositor
               cleanCategoryName = cleanCategoryName.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/u, '').trim()
               if (!cleanCategoryName) continue
 
-              // 从预设分类中查找对应的 emoji 和颜色
+              // 从预设分类或语义推导中查找对应的 emoji 和颜色
               const presetInfo = presetMap.get(cleanCategoryName) || presetMap.get(categoryName)
-              const emoji = presetInfo?.emoji
-              const color = presetInfo?.color || CATEGORY_COLORS[cleanCategoryName] || CATEGORY_COLORS[categoryName] || '#9e9e9e'
+              const { inferCategoryStyle } = await import('@/utils/categoryStyles')
+              const inferred = inferCategoryStyle(cleanCategoryName)
+              const emoji = presetInfo?.emoji || inferred.emoji
+              const color = presetInfo?.color || CATEGORY_COLORS[cleanCategoryName] || CATEGORY_COLORS[categoryName] || inferred.color
 
               // 检查分类是否已存在（精确匹配名称）
               let existingTag = tagStore.tags.find((t: any) => 
@@ -1140,11 +1384,29 @@ onMounted(() => {
 }
 
 .tag-delete,
+.tag-more-btn,
 .tag-ai-classify,
 .lang-ai-classify,
 .untagged-ai-classify {
   opacity: 0;
   transition: opacity $transition-base;
+}
+
+.tag-item:hover {
+  .tag-more-btn,
+  .tag-ai-classify {
+    opacity: 1;
+  }
+}
+
+.tag-more-btn {
+  color: var(--text-tertiary) !important;
+  margin-left: 2px;
+
+  &:hover {
+    color: var(--el-color-primary) !important;
+    background: rgba(64, 158, 255, 0.1) !important;
+  }
 }
 
 .tag-ai-classify,

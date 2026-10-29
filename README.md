@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hujinghaoabcd/StarHub/stargazers"><img src="https://img.shields.io/github/stars/hujinghaoabcd/StarHub?style=flat&logo=github" alt="GitHub Stars"></a>
-  <a href="https://github.com/hujinghaoabcd/StarHub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/hujinghaoabcd/StarHub?style=flat" alt="License"></a>
+  <a href="https://github.com/ilovesusu/StarHub/stargazers"><img src="https://img.shields.io/github/stars/ilovesusu/StarHub?style=flat&logo=github" alt="GitHub Stars"></a>
+  <a href="https://github.com/ilovesusu/StarHub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ilovesusu/StarHub?style=flat" alt="License"></a>
   <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat" alt="Version">
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat&logo=node.js" alt="Node.js">
   <img src="https://img.shields.io/badge/vue-3.4-4FC08D?style=flat&logo=vue.js" alt="Vue.js">
@@ -228,7 +228,7 @@ StarHub 内置 18 种专业分类，覆盖主流技术领域：
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/hujinghaoabcd/StarHub.git
+git clone https://github.com/ilovesusu/StarHub.git
 cd StarHub
 
 # 2. 安装依赖
@@ -616,14 +616,19 @@ fetch('/emergency-clear.js').then(r => r.text()).then(eval);
 
 ---
 
-## 📄 开源协议
+## 📄 开源协议与版权声明
 
-本项目采用 [MIT License](LICENSE) 开源协议。
+本项目基于 [MIT License](LICENSE) 开源协议维护。
+
+- **当前仓库维护者**：[Joy Jasper (ilovesusu)](https://github.com/ilovesusu)
+- **原始项目版权**：Copyright (c) 2025 Jinghao Hu ([hujinghaoabcd](https://github.com/hujinghaoabcd))
+- **衍生增强版权**：Copyright (c) 2026 Joy Jasper ([ilovesusu](https://github.com/ilovesusu))
 
 ---
 
 ## 🙏 致谢
 
+- 感谢原作者 [Jinghao Hu (hujinghaoabcd)](https://github.com/hujinghaoabcd) 开源了 StarHub 原始版本
 - [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
 - [Element Plus](https://element-plus.org/) - Vue 3 组件库
 - [Dexie.js](https://dexie.org/) - IndexedDB 封装库

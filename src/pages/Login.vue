@@ -18,7 +18,7 @@
           {{ currentLanguage === 'zh' ? '文档' : 'Docs' }}
         </a>
         <span class="nav-divider">|</span>
-        <a href="https://github.com/hujinghaoabcd/StarHub" target="_blank" class="nav-link">
+        <a href="https://github.com/ilovesusu/StarHub" target="_blank" class="nav-link">
           GitHub
         </a>
         <span class="nav-divider">|</span>
@@ -55,7 +55,7 @@
               {{ currentLanguage === 'zh' ? '使用 GitHub 登录' : 'Sign in with GitHub' }}
           </el-button>
 
-            <a href="https://github.com/hujinghaoabcd/StarHub" target="_blank" class="github-link">
+            <a href="https://github.com/ilovesusu/StarHub" target="_blank" class="github-link">
               <el-icon :size="20"><Link /></el-icon>
               {{ currentLanguage === 'zh' ? '查看源码' : 'View on GitHub' }}
             </a>
@@ -338,11 +338,11 @@
           <span>StarHub</span>
         </div> -->
         <div class="footer-links">
-          <a href="https://github.com/hujinghaoabcd/StarHub" target="_blank">GitHub</a>
-          <a href="https://github.com/hujinghaoabcd/StarHub/issues" target="_blank">{{ currentLanguage === 'zh' ? '问题反馈' : 'Issues' }}</a>
-          <a href="https://github.com/hujinghaoabcd/StarHub/blob/main/LICENSE" target="_blank">MIT License</a>
+          <a href="https://github.com/ilovesusu/StarHub" target="_blank">GitHub</a>
+          <a href="https://github.com/ilovesusu/StarHub/issues" target="_blank">{{ currentLanguage === 'zh' ? '问题反馈' : 'Issues' }}</a>
+          <a href="https://github.com/ilovesusu/StarHub/blob/main/LICENSE" target="_blank">MIT License</a>
         </div>
-        <p class="footer-copyright">&copy; 2024 StarHub. {{ currentLanguage === 'zh' ? '专业的 GitHub Stars 管理工具，让你的收藏井井有条。' : 'Professional GitHub Stars management tool. Organize your collection with ease.' }}</p>
+        <p class="footer-copyright">&copy; 2026 StarHub (by Joy Jasper) · 基于原作者 Jinghao Hu (MIT License) 增强维护 · {{ currentLanguage === 'zh' ? '专业的 GitHub Stars 管理工具，让你的收藏井井有条。' : 'Professional GitHub Stars management tool. Organize your collection with ease.' }}</p>
         <p class="footer-made">{{ currentLanguage === 'zh' ? '用 ❤️ 和 Vue 3 + TypeScript + Vite 构建' : 'Made with ❤️ using Vue 3 + TypeScript + Vite' }}</p>
       </div>
     </div>

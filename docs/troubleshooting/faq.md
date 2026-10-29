@@ -173,7 +173,7 @@
 
 ### Q: 如何反馈 Bug？
 
-**A:** 请在 [GitHub Issues](https://github.com/hujinghaoabcd/StarHub/issues) 提交，描述问题和复现步骤。
+**A:** 请在 [GitHub Issues](https://github.com/ilovesusu/StarHub/issues) 提交，描述问题和复现步骤。
 
 ---
 

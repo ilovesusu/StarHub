@@ -240,5 +240,5 @@ StarHub 仅需要以下权限：
 
 ---
 
-如有问题，请提交 [GitHub Issue](https://github.com/hujinghaoabcd/StarHub/issues)。
+如有问题，请提交 [GitHub Issue](https://github.com/ilovesusu/StarHub/issues)。
 

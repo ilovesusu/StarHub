@@ -708,7 +708,7 @@ const handleSizeChange = (size: number) => {
         border-color: #409EFF !important;
       }
       
-      :deep(.el-icon) {
+      .el-icon {
         color: inherit !important;
       }
     }

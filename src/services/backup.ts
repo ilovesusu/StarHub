@@ -1,5 +1,6 @@
 import { db } from '@/db'
 import { getCategoryPresets, saveCategoryPresets, type CategoryPreset } from '@/config/categories'
+import { getMultiAIConfig, saveMultiAIConfig, type MultiAIConfig } from '@/config/ai'
 import { useRepoStore } from '@/stores/repo'
 import { useTagStore } from '@/stores/tag'
 
@@ -11,6 +12,7 @@ export interface BackupDataPayload {
     tags: any[]
     repoTags: any[]
     categoryPresets?: CategoryPreset[]
+    multiAIConfig?: MultiAIConfig
   }
   stats?: any
 }
@@ -24,13 +26,14 @@ export async function createBackupPayload(stats?: any): Promise<BackupDataPayloa
   const repoTags = db.repoTags ? await db.repoTags.toArray() : []
 
   return {
-    version: '1.0',
+    version: '1.1',
     exportDate: new Date().toISOString(),
     data: {
       repos,
       tags,
       repoTags,
-      categoryPresets: getCategoryPresets()
+      categoryPresets: getCategoryPresets(),
+      multiAIConfig: getMultiAIConfig()
     },
     stats: stats || null
   }
@@ -98,9 +101,12 @@ export async function restoreBackupData(importData: string | BackupDataPayload):
     await db.repoTags.bulkAdd(data.data.repoTags)
   }
 
-  // 5. 恢复分类预设
+  // 5. 恢复分类预设与多配置
   if (data.data.categoryPresets) {
     saveCategoryPresets(data.data.categoryPresets)
+  }
+  if (data.data.multiAIConfig) {
+    saveMultiAIConfig(data.data.multiAIConfig)
   }
 
   // 6. 刷新 Store 数据

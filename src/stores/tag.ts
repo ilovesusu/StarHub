@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { Tag } from '@/types'
 import { db } from '@/db'
+import { inferCategoryStyle, isTagUnstyled } from '@/utils/categoryStyles'
 
 export const useTagStore = defineStore('tag', {
   state: () => ({
@@ -307,6 +308,163 @@ export const useTagStore = defineStore('tag', {
         repos: tag.repos.filter(id => allRepoIds.has(id))
       }))
       await this.updateAndSaveTags(freshTags)
+    },
+
+    /**
+     * 合并两个分类/标签
+     * 将 sourceTag 下的所有仓库合并到 targetTag，并可选删除 sourceTag
+     */
+    async mergeTags(sourceTagId: string, targetTagId: string, deleteSource: boolean = true) {
+      if (sourceTagId === targetTagId) {
+        throw new Error('无法将分类合并到自身')
+      }
+
+      if (!db.isOpen()) {
+        await db.open()
+      }
+
+      const sourceTag = this.$state.tags.find(t => t.id === sourceTagId)
+      const targetTag = this.$state.tags.find(t => t.id === targetTagId)
+
+      if (!sourceTag || !targetTag) {
+        throw new Error('未找到要合并的分类')
+      }
+
+      // 合并仓库 ID 列表
+      const mergedRepos = Array.from(new Set([...(targetTag.repos || []), ...(sourceTag.repos || [])]))
+      
+      // 更新目标分类
+      await this.updateTag(targetTag.id, {
+        repos: mergedRepos
+      })
+
+      // 如果启用了 repoTags 表，同步维护关系
+      if (db.repoTags && sourceTag.repos && sourceTag.repos.length > 0) {
+        try {
+          const itemsToAdd = sourceTag.repos.map(repoId => ({
+            repoId,
+            tagId: targetTag.id,
+            createdAt: Date.now()
+          }))
+          await db.repoTags.bulkPut(itemsToAdd)
+          
+          if (deleteSource) {
+            await db.repoTags.where('tagId').equals(sourceTag.id).delete()
+          }
+        } catch (e) {
+          console.warn('Sync repoTags during merge warning:', e)
+        }
+      }
+
+      // 删除源分类
+      if (deleteSource) {
+        await this.deleteTag(sourceTag.id)
+      }
+    },
+
+    /**
+     * 批量合并分类
+     * @param merges 待合并的映射列表 [{ sourceTagId, targetTagId, deleteSource }]
+     */
+    async batchMergeTags(
+      merges: { sourceTagId: string; targetTagId: string; deleteSource?: boolean }[]
+    ): Promise<{ mergedCount: number; affectedReposCount: number }> {
+      if (!merges || merges.length === 0) return { mergedCount: 0, affectedReposCount: 0 }
+
+      if (!db.isOpen()) {
+        await db.open()
+      }
+
+      let mergedCount = 0
+      let affectedReposCount = 0
+
+      for (const item of merges) {
+        if (!item.sourceTagId || !item.targetTagId || item.sourceTagId === item.targetTagId) {
+          continue
+        }
+
+        const sourceTag = this.$state.tags.find(t => t.id === item.sourceTagId)
+        const targetTag = this.$state.tags.find(t => t.id === item.targetTagId)
+
+        if (!sourceTag || !targetTag) continue
+
+        const sourceRepos = sourceTag.repos || []
+        const mergedRepos = Array.from(new Set([...(targetTag.repos || []), ...sourceRepos]))
+        affectedReposCount += sourceRepos.length
+
+        // 更新目标分类
+        await this.updateTag(targetTag.id, {
+          repos: mergedRepos
+        })
+
+        // 维护 repoTags 表
+        if (db.repoTags && sourceRepos.length > 0) {
+          try {
+            const itemsToAdd = sourceRepos.map(repoId => ({
+              repoId,
+              tagId: targetTag.id,
+              createdAt: Date.now()
+            }))
+            await db.repoTags.bulkPut(itemsToAdd)
+            if (item.deleteSource !== false) {
+              await db.repoTags.where('tagId').equals(sourceTag.id).delete()
+            }
+          } catch (e) {
+            console.warn('Sync repoTags warning during batch merge:', e)
+          }
+        }
+
+        // 删除源分类
+        if (item.deleteSource !== false) {
+          await this.deleteTag(sourceTag.id)
+        }
+
+        mergedCount++
+      }
+
+      await this.loadTags()
+      return { mergedCount, affectedReposCount }
+    },
+
+    /**
+     * 一键智能美化与修复所有分类样式
+     * 自动为缺失 Emoji 或使用默认灰色的分类，匹配最贴切的 Emoji 和好看的主题色
+     */
+    async beautifyAllTags(force: boolean = false): Promise<number> {
+      if (this.$state.tags.length === 0) {
+        await this.loadTags()
+      }
+      if (this.$state.tags.length === 0) return 0
+
+      let updatedCount = 0
+      const updatedTags = this.$state.tags.map(tag => {
+        if (force || isTagUnstyled(tag)) {
+          const style = inferCategoryStyle(tag.name)
+          let hasChange = false
+          const newTag = { ...tag }
+          
+          if (!newTag.emoji || force) {
+            newTag.emoji = style.emoji
+            hasChange = true
+          }
+          if (isTagUnstyled(tag) || force) {
+            newTag.color = style.color
+            hasChange = true
+          }
+          
+          if (hasChange) {
+            updatedCount++
+            return newTag
+          }
+        }
+        return tag
+      })
+
+      if (updatedCount > 0) {
+        await this.updateAndSaveTags(updatedTags)
+      }
+
+      return updatedCount
     }
   }
 })

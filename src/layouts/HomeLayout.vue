@@ -61,6 +61,41 @@
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
+
+        <!-- 快速切换 AI 模型配置 -->
+        <el-dropdown @command="handleSwitchAIProfile" trigger="click" class="ai-switcher-dropdown">
+          <div class="ai-profile-switcher" :title="t('settings.switchAIProfile')">
+            <span class="ai-icon">🤖</span>
+            <span class="ai-profile-name">{{ currentAIProfileName }}</span>
+            <el-icon class="ai-arrow"><ArrowDown /></el-icon>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu class="ai-switcher-menu">
+              <div class="ai-switcher-header">
+                {{ t('settings.aiProfiles') }}
+              </div>
+              <el-dropdown-item
+                v-for="profile in aiProfiles"
+                :key="profile.id"
+                :command="profile.id"
+                :class="{ 'is-selected': profile.id === currentAIProfileId }"
+              >
+                <div class="ai-profile-option">
+                  <div class="profile-info">
+                    <span class="profile-name">{{ profile.name }}</span>
+                    <span class="profile-model">{{ profile.model || profile.provider }}</span>
+                  </div>
+                  <el-icon v-if="profile.id === currentAIProfileId" class="profile-check"><Check /></el-icon>
+                </div>
+              </el-dropdown-item>
+              <el-dropdown-item divided command="__manage__">
+                <el-icon><Setting /></el-icon>
+                <span>{{ t('settings.manageAIProfiles') }}</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+
         <el-dropdown @command="handleLanguageChange" trigger="click">
           <el-button circle>
             <el-icon><Promotion /></el-icon>
@@ -134,7 +169,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessageBox, ElMessage } from 'element-plus'
@@ -144,6 +179,7 @@ import { useRepoStore } from '@/stores/repo'
 import { AuthToken } from '@/utils/auth'
 import { githubApi } from '@/api/github'
 import { debounce, formatDate } from '@/utils'
+import { getMultiAIConfig, switchAIProfile } from '@/config/ai'
 const { t, locale } = useI18n()
 import {
   Search,
@@ -157,7 +193,9 @@ import {
   Loading,
   Refresh,
   Coin,
-  Clock
+  Clock,
+  Check,
+  ArrowDown
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -172,6 +210,38 @@ const currentLanguage = computed(() => themeStore.language)
 const syncing = computed(() => repoStore.isSyncing)
 const syncProgress = computed(() => repoStore.syncProgress)
 const lastSyncTime = computed(() => repoStore.lastSyncTime)
+
+// AI 配置方案快速切换
+const multiAIConfig = ref(getMultiAIConfig())
+const aiProfiles = computed(() => multiAIConfig.value.profiles)
+const currentAIProfileId = computed(() => multiAIConfig.value.activeProfileId)
+const currentAIProfile = computed(() => {
+  return aiProfiles.value.find(p => p.id === currentAIProfileId.value) || aiProfiles.value[0]
+})
+const currentAIProfileName = computed(() => {
+  if (!currentAIProfile.value || !currentAIProfile.value.apiKey) {
+    return t('settings.noAIProfiles')
+  }
+  return currentAIProfile.value.name
+})
+
+const handleSwitchAIProfile = (command: string) => {
+  if (command === '__manage__') {
+    router.push({ path: '/settings', query: { tab: 'ai' } })
+    return
+  }
+  try {
+    const profile = switchAIProfile(command)
+    multiAIConfig.value = getMultiAIConfig()
+    ElMessage.success(t('settings.switchedToProfile', { name: profile.name }))
+  } catch (e: any) {
+    ElMessage.error(e.message || '切换失败')
+  }
+}
+
+const syncAIConfigFromEvent = () => {
+  multiAIConfig.value = getMultiAIConfig()
+}
 
 const formattedLastSyncTime = computed(() => {
   if (!lastSyncTime.value) {
@@ -370,6 +440,9 @@ onMounted(async () => {
   // 加载本地数据库占用大小
   updateDbSize()
 
+  window.addEventListener('starhub:ai-config-updated', syncAIConfigFromEvent)
+  window.addEventListener('starhub:ai-profile-switched', syncAIConfigFromEvent)
+
   // 如果有 token 但没有用户信息，尝试从 GitHub API 获取
   if (AuthToken.exist() && !userStore.user) {
     try {
@@ -382,6 +455,11 @@ onMounted(async () => {
       userStore.clearUser()
     }
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('starhub:ai-config-updated', syncAIConfigFromEvent)
+  window.removeEventListener('starhub:ai-profile-switched', syncAIConfigFromEvent)
 })
 </script>
 
@@ -564,6 +642,44 @@ onMounted(async () => {
         .el-icon {
           color: var(--text-tertiary) !important;
         }
+      }
+    }
+
+    .ai-profile-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: all $transition-base;
+      user-select: none;
+
+      &:hover {
+        border-color: var(--el-color-primary);
+        background: rgba(64, 158, 255, 0.06);
+      }
+
+      .ai-icon {
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .ai-profile-name {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ai-arrow {
+        font-size: 11px;
+        color: var(--text-tertiary);
       }
     }
 
@@ -766,6 +882,50 @@ onMounted(async () => {
   // 深色模式下使用与应用一致的背景色
   [data-theme='dark'] & {
     background: #1c2333 !important;
+  }
+}
+.ai-switcher-dropdown {
+  display: inline-flex;
+  align-items: center;
+}
+
+:deep(.ai-switcher-header) {
+  padding: 6px 16px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+:deep(.ai-profile-option) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+  min-width: 180px;
+
+  .profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .profile-name {
+      font-weight: 500;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+    }
+
+    .profile-model {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+    }
+  }
+
+  .profile-check {
+    color: var(--el-color-primary);
+    font-size: 14px;
   }
 }
 </style>

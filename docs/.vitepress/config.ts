@@ -96,12 +96,12 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/hujinghaoabcd/StarHub' }
+      { icon: 'github', link: 'https://github.com/ilovesusu/StarHub' }
     ],
 
     footer: {
-      message: '基于 MIT 许可发布',
-      copyright: 'Copyright © 2024 StarHub'
+      message: '基于 MIT 许可发布 | 原作者: Jinghao Hu，增强维护: Joy Jasper',
+      copyright: 'Copyright © 2025-2026 StarHub'
     },
 
     search: {
@@ -139,7 +139,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/hujinghaoabcd/StarHub/edit/main/docs/:path',
+      pattern: 'https://github.com/ilovesusu/StarHub/edit/main/docs/:path',
       text: '在 GitHub 上编辑此页面'
     }
   }

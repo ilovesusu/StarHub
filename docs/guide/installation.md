@@ -17,8 +17,8 @@
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/hujinghaoabcd/StarHub.git
-cd starhub
+git clone https://github.com/ilovesusu/StarHub.git
+cd StarHub
 ```
 
 ### 2. 安装依赖
@@ -116,8 +116,8 @@ Make sure your system meets these prerequisites:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/hujinghaoabcd/StarHub.git
-cd starhub
+git clone https://github.com/ilovesusu/StarHub.git
+cd StarHub
 ```
 
 ### 2. Install dependencies

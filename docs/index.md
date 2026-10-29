@@ -14,7 +14,7 @@ hero:
       link: /guide/installation
     - theme: alt
       text: 在 GitHub 上查看
-      link: https://github.com/hujinghaoabcd/StarHub
+      link: https://github.com/ilovesusu/StarHub
 
 features:
   - icon: 🏷️
